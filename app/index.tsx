@@ -1,8 +1,6 @@
 import Global from '@/constants/Global';
-import { authService } from '../services/authService';
 import { useLocation } from '@/contexts/LocationContext';
-import { storage } from '../utils/storage';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,16 +16,18 @@ import {
   TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  View,
+  View
 } from 'react-native';
+import { authService } from '../services/authService';
+import { initializeNotifications } from '../services/notificationService';
+import { storage } from '../utils/storage';
 
 const LoginPage: React.FC = () => {
-  const navigation = useNavigation();
+  const router = useRouter();
   const { startTracking, connectWebSocket, disconnectWebSocket } = useLocation();
   const [number, setNumber] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const handleLogin = async () => {
     // 입력 검증
@@ -52,9 +52,12 @@ const LoginPage: React.FC = () => {
       // AsyncStorage에 로그인 정보 저장
       await storage.setLoginInfo(response.apiKey, response.number, response.name);
 
+      // 로그인 성공 후 알림 토큰 발급 및 서버 등록
+      await initializeNotifications();
+
       // 기존 연결이 있다면 정리하고 역할 선택 화면으로 이동
       await disconnectWebSocket();
-      navigation.navigate('SelectRole' as never);
+      router.replace('/SelectRole');
     } catch (error: any) {
       const message = error.response?.data?.message || '로그인에 실패했습니다. 다시 시도해주세요.';
       Alert.alert('로그인 실패', message);
@@ -64,154 +67,104 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleForgotPassword = () => {
-    Alert.alert('비밀번호 찾기', '추후 추가될 서비스 입니다.');
-  };
-
   const handleSignup = () => {
-    navigation.navigate('Signup' as never);
+    router.push('/Signup');
   };
-
-  const baseInputWrapperStyle = 'flex-row items-center border-2 rounded-xl px-4 py-3';
-  const focusedInputWrapperStyle = 'border-teal-500 bg-teal-50';
-  const blurredInputWrapperStyle = 'border-gray-100 bg-gray-50';
 
   return (
-    <SafeAreaView style={{ flex: 1 }} className="bg-green-50">
-      <StatusBar barStyle="dark-content" backgroundColor="#f0fdf4" />
+    <SafeAreaView className="flex-1 bg-white">
+      <StatusBar barStyle="light-content" backgroundColor="#22c55e" />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-        style={{ flex: 1 }}
+        className="flex-1"
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <ScrollView
-            contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, paddingVertical: 40 }}
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <View className="flex-1 justify-center">
-              <View className="w-full max-w-sm mx-auto">
-            {/* 로고 및 헤더 섹션 */}
-            <View className="items-center mb-12">
-              <View className="mb-5 overflow-hidden">
+            {/* 헤더 섹션 - Signup.tsx와 통일감 있는 디자인 */}
+            <View className="bg-green-500 px-6 pt-16 pb-12 rounded-b-[40px] shadow-sm mb-8 items-center">
+              <View className="mb-6 p-2 bg-white/20 rounded-full">
                 <Image
                   source={require('../assets/images/logo.png')}
-                  className="w-20 h-20 rounded-full" // 여기에 rounded-full을 직접 적용하여 이미지를 완전한 원으로 만듭니다.
+                  className="w-24 h-24 rounded-full"
                   resizeMode="cover"
                 />
               </View>
-              <Text style={{ fontFamily: 'System' }} className="text-3xl font-bold text-teal-800 mb-2 tracking-tight">
-                안녕하세요!
+              <Text className="text-3xl font-bold text-white mb-2 tracking-tight text-center">
+                Safety Fence
               </Text>
-              <Text style={{ fontFamily: 'System' }} className="text-base text-black-500 font-normal">
+              <Text className="text-green-100 text-base font-medium text-center">
                 안전하고 편리한 케어 서비스
               </Text>
             </View>
 
-            {/* 로그인 폼 */}
-            <View className="bg-white rounded-2xl shadow-xl p-6">
-              <View className="mb-4"> 
-                <Text style={{ fontFamily: 'System' }} className="text-sm font-semibold text-gray-700 mb-3 tracking-wide">
-                  전화번호
-                </Text>
-                <View
-                  className={`${baseInputWrapperStyle} ${
-                    focusedField === 'number'
-                      ? focusedInputWrapperStyle
-                      : blurredInputWrapperStyle
-                  }`}
+            <View className="px-6">
+              {/* 로그인 폼 */}
+              <View className="mb-6">
+                <Text className="text-gray-600 font-semibold mb-2 ml-1">전화번호</Text>
+                <TextInput
+                  className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 text-gray-900 text-base mb-5"
+                  placeholder="01012345678"
+                  placeholderTextColor="#9ca3af"
+                  value={number}
+                  onChangeText={setNumber}
+                  keyboardType="phone-pad"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+
+                <Text className="text-gray-600 font-semibold mb-2 ml-1">비밀번호</Text>
+                <TextInput
+                  className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 text-gray-900 text-base mb-8"
+                  placeholder="비밀번호를 입력하세요"
+                  placeholderTextColor="#9ca3af"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                />
+
+                <TouchableOpacity
+                  className={`w-full py-4 rounded-2xl items-center justify-center shadow-lg shadow-green-200 ${isLoading ? 'bg-green-400' : 'bg-green-500 active:bg-green-600'
+                    }`}
+                  onPress={handleLogin}
+                  disabled={isLoading}
+                  activeOpacity={0.8}
                 >
-                  <TextInput
-                    style={{ fontFamily: 'System' }}
-                    className="flex-1 text-gray-900 text-base"
-                    placeholder="01012345678"
-                    placeholderTextColor="#9ca3af"
-                    value={number}
-                    onChangeText={setNumber}
-                    onFocus={() => setFocusedField('number')}
-                    onBlur={() => setFocusedField(null)}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="phone-pad"
-                  />
-                </View>
+                  {isLoading ? (
+                    <View className="flex-row items-center">
+                      <ActivityIndicator size="small" color="white" />
+                      <Text className="text-white font-bold text-lg ml-2">
+                        로그인 중...
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text className="text-white font-bold text-lg">
+                      로그인
+                    </Text>
+                  )}
+                </TouchableOpacity>
               </View>
 
-              <View className="mb-4">
-                <Text style={{ fontFamily: 'System' }} className="text-sm font-semibold text-gray-700 mb-3 tracking-wide">
-                  비밀번호
+              {/* 회원가입 및 추가 링크 */}
+              <View className="flex-row justify-center items-center mb-8">
+                <Text className="text-gray-500 text-base">
+                  계정이 없으신가요?
                 </Text>
-                <View
-                  className={`${baseInputWrapperStyle} ${
-                    focusedField === 'password'
-                      ? focusedInputWrapperStyle
-                      : blurredInputWrapperStyle
-                  }`}
-                >
-                  <TextInput
-                    style={{ fontFamily: 'System' }}
-                    className="flex-1 text-gray-900 text-base"
-                    placeholder="비밀번호를 입력하세요"
-                    placeholderTextColor="#9ca3af"
-                    value={password}
-                    onChangeText={setPassword}
-                    onFocus={() => setFocusedField('password')}
-                    onBlur={() => setFocusedField(null)}
-                    secureTextEntry
-                  />
-                </View>
-              </View>
-
-              <View className="flex-row justify-end mb-4">
-                <TouchableOpacity onPress={handleForgotPassword} className="py-1">
-                  <Text style={{ fontFamily: 'System' }} className="text-sm text-teal-600 font-medium">
-                    비밀번호를 잊으셨나요?
+                <TouchableOpacity onPress={handleSignup} className="ml-2 py-2">
+                  <Text className="text-green-500 font-bold text-base">
+                    회원가입
                   </Text>
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity
-                className={`w-full py-4 rounded-xl items-center justify-center shadow-lg ${
-                  isLoading ? 'bg-teal-400' : 'bg-teal-600'
-                }`}
-                onPress={handleLogin}
-                disabled={isLoading}
-                activeOpacity={0.8}
-              >
-                {isLoading ? (
-                  <View className="flex-row items-center">
-                    <ActivityIndicator size="small" color="white" />
-                    <Text style={{ fontFamily: 'System' }} className="text-white font-semibold text-base ml-2 tracking-wide">
-                      로그인 중...
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={{ fontFamily: 'System' }} className="text-white font-semibold text-base tracking-wide">
-                    로그인
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-
-            {/* 회원가입 섹션 */}
-            <View className="mt-8 flex-row justify-center items-center">
-              <Text style={{ fontFamily: 'System' }} className="text-base text-gray-600 font-normal">
-                계정이 없으신가요?
-              </Text>
-              <TouchableOpacity onPress={handleSignup} className="ml-2 py-1">
-                <Text style={{ fontFamily: 'System' }} className="text-base text-teal-600 font-bold">
-                  회원가입
+              {/* 하단 정보 */}
+              <View className="items-center mt-auto">
+                <Text className="text-xs text-gray-400 text-center leading-5">
+                  로그인함으로써{'\n'}서비스 이용약관에 동의합니다
                 </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* 추가 정보 */}
-            <View className="mt-8 items-center">
-              <Text style={{ fontFamily: 'System' }} className="text-xs text-gray-400 font-light">
-                로그인함으로써 서비스 이용약관에 동의합니다
-              </Text>
-            </View>
               </View>
             </View>
           </ScrollView>

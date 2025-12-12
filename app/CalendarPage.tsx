@@ -1,8 +1,8 @@
 import Global from '@/constants/Global';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { Calendar, CheckSquare, Clock, MapPin, Plus, Trash2 } from 'lucide-react-native';
-import React, { useEffect, useMemo, useState } from 'react';
+import { Calendar, CheckSquare, Clock, Image as ImageIcon, MapPin, Plus, Trash2 } from 'lucide-react-native';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   Image,
@@ -16,6 +16,7 @@ import {
 import BottomNavigation from '../components/BottomNavigation';
 import TodoModal from '../components/TodoModal';
 import { calendarService } from '../services/calendarService';
+import { GalleryPhoto, galleryService } from '../services/galleryService';
 
 // --- 타입 정의 ---
 type RootStackParamList = {
@@ -55,51 +56,47 @@ interface Log {
   type: 'log';
 }
 
-type CalendarItem = (Schedule & { itemType: 'schedule' }) | (Todo & { itemType: 'todo' }) | (Log & { itemType: 'log' });
+type CalendarItem =
+  | (Schedule & { itemType: 'schedule' })
+  | (Todo & { itemType: 'todo' })
+  | (Log & { itemType: 'log' })
+  | (GalleryPhoto & { itemType: 'photo' });
 
 // --- 상수 ---
 // 로컬 시간 기준으로 오늘 날짜 생성
 const today = new Date();
 const todayDateStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
 
-console.log('오늘 날짜:', todayDateStr, '요일:', ['일','월','화','수','목','금','토'][today.getDay()]);
-
 // --- 캘린더 날짜 유틸리티 ---
 const getDaysInMonth = (date: Date) => {
   const year = date.getFullYear();
   const month = date.getMonth();
-  
+
   // 해당 월의 총 일수
   const lastDay = new Date(year, month + 1, 0);
   const daysInMonth = lastDay.getDate();
-  
-  // 1일의 요일을 직접 계산 (더 정확함)
+
+  // 1일의 요일을 직접 계산
   const firstDayOfMonth = new Date(year, month, 1);
   let startingDayOfWeek = firstDayOfMonth.getDay();
-  
-  // 디버깅: 실제 요일 확인
-  console.log(`${year}년 ${month+1}월 1일: getDay()=${startingDayOfWeek} (${['일','월','화','수','목','금','토'][startingDayOfWeek]}요일)`);
-  console.log(`firstDayOfMonth:`, firstDayOfMonth.toString());
-  
+
   const days: (number | null)[] = [];
-  
+
   // 1일 이전 빈 칸 채우기
   for (let i = 0; i < startingDayOfWeek; i++) {
     days.push(null);
   }
-  
+
   // 실제 날짜 채우기
   for (let day = 1; day <= daysInMonth; day++) {
     days.push(day);
   }
-  
+
   // 마지막 주를 7의 배수로 맞추기
   while (days.length % 7 !== 0) {
     days.push(null);
   }
-  
-  console.log(`총 ${days.length}칸 (빈칸 ${startingDayOfWeek}개 + 날짜 ${daysInMonth}개)`);
-  
+
   return days;
 };
 
@@ -194,160 +191,83 @@ const LogCard: React.FC<{ log: Log }> = React.memo(({ log }) => (
   </View>
 ));
 
+// --- 분리된 갤러리 사진 카드 컴포넌트 ---
+const PhotoCard: React.FC<{ photo: GalleryPhoto }> = React.memo(({ photo }) => (
+  <View className="bg-white rounded-xl shadow p-4 mb-3 border border-gray-100">
+    <View className="flex-row items-start">
+      <View className="h-11 w-11 bg-orange-50 rounded-lg items-center justify-center mr-3">
+        <ImageIcon size={20} color="#F97316" />
+      </View>
+      <View className="flex-1">
+        <Text className="text-base font-bold text-gray-900 mb-1">{photo.title || '갤러리 사진'}</Text>
+        <Image source={{ uri: photo.uri }} className="w-full h-48 rounded-lg my-2" resizeMode="cover" />
+        {photo.description && (
+          <Text className="text-sm text-gray-500 mb-2">{photo.description}</Text>
+        )}
+        <View className="self-start px-2.5 py-1 rounded-full bg-orange-100">
+          <Text className="text-xs font-semibold text-orange-700">
+            갤러리
+          </Text>
+        </View>
+      </View>
+    </View>
+  </View>
+));
+
 // --- 메인 캘린더 페이지 컴포넌트 ---
 const CalendarPage: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [logs, setLogs] = useState<Log[]>([]);
+  const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(todayDateStr);
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [isTodoModalVisible, setIsTodoModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   // 캘린더 데이터 로드
-  useEffect(() => {
-    const loadCalendarData = async () => {
-      setIsLoading(true);
-      try {
-        // 보호자 모드: 선택된 이용자의 캘린더 데이터 조회
-        const targetNumber = Global.USER_ROLE === 'supporter' && Global.TARGET_NUMBER
-          ? Global.TARGET_NUMBER
-          : undefined;
-
-        const calendarData = await calendarService.getUserData(targetNumber);
-        console.log('캘린더 데이터 조회:', targetNumber ? `이용자 ${targetNumber}` : '본인');
-
-        // 데이터 변환: API 응답 -> UI 형식
-        const allSchedules: Schedule[] = [];
-        const allTodos: Todo[] = [];
-        const allLogs: Log[] = [];
-
-        calendarData.forEach((dayData) => {
-          // logs를 Log[]로 변환
-          dayData.logs.forEach((log) => {
-            allLogs.push({
-              id: log.logId,
-              location: log.location,
-              address: log.locationAddress,
-              arriveTime: log.arriveTime,
-              date: dayData.date,
-              type: 'log',
-            });
-          });
-
-          // geofences를 schedules로 변환
-          dayData.geofences.forEach((fence) => {
-            // ISO 문자열에서 HH:mm 추출
-            const start = new Date(fence.startTime);
-            const end = new Date(fence.endTime);
-
-            allSchedules.push({
-              id: fence.geofenceId,
-              name: fence.name,
-              address: fence.address,
-              startTime: `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`,
-              endTime: `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`,
-              date: dayData.date,
-              type: 'temporary', // API에서 타입 정보가 없으므로 일시적으로 설정
-            });
-          });
-
-          // userEvents를 todos로 변환
-          dayData.userEvents.forEach((event) => {
-            // "HH:mm:ss" -> Date 객체로 변환
-            const [hours, minutes] = event.eventStartTime.split(':').map(Number);
-            const time = new Date();
-            time.setHours(hours);
-            time.setMinutes(minutes);
-            time.setSeconds(0);
-
-            allTodos.push({
-              id: event.userEventId,
-              title: event.event,
-              time,
-              date: dayData.date,
-              type: 'todo',
-            });
-          });
-        });
-
-        setSchedules(allSchedules);
-        setTodos(allTodos);
-        setLogs(allLogs);
-        console.log('캘린더 데이터 로드 성공:', allLogs.length, 'logs,', allSchedules.length, 'schedules,', allTodos.length, 'todos');
-      } catch (error) {
-        console.error('캘린더 데이터 로드 실패:', error);
-        Alert.alert('오류', '캘린더 데이터를 불러오는 데 실패했습니다.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadCalendarData();
-  }, []);
-
-  const itemsByDate = useMemo(() => {
-    const map = new Map<string, CalendarItem[]>();
-    [...logs, ...schedules, ...todos].forEach(item => {
-      const date = item.date;
-      const items = map.get(date) || [];
-      const typedItem = item.type === 'log'
-        ? { ...item, itemType: 'log' as const }
-        : item.type === 'todo'
-        ? { ...item, itemType: 'todo' as const }
-        : { ...item, itemType: 'schedule' as const };
-      map.set(date, [...items, typedItem]);
-    });
-    return map;
-  }, [logs, schedules, todos]);
-
-  const sortedSelectedDateItems = useMemo(() => {
-    const items = itemsByDate.get(selectedDate) || [];
-    return [...items].sort((a, b) => {
-      const timeA = a.itemType === 'log'
-        ? a.arriveTime
-        : a.itemType === 'schedule'
-        ? a.startTime
-        : a.time.getHours().toString().padStart(2, '0') + ':' + a.time.getMinutes().toString().padStart(2, '0');
-      const timeB = b.itemType === 'log'
-        ? b.arriveTime
-        : b.itemType === 'schedule'
-        ? b.startTime
-        : b.time.getHours().toString().padStart(2, '0') + ':' + b.time.getMinutes().toString().padStart(2, '0');
-      return timeA.localeCompare(timeB);
-    });
-  }, [itemsByDate, selectedDate]);
-
-  const hasItemsOnDate = useMemo(() => {
-    const datesWithItems = new Set(itemsByDate.keys());
-    return (day: number): boolean => {
-      const dateStr = `${currentMonth.getFullYear()}-${(currentMonth.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-      return datesWithItems.has(dateStr);
-    };
-  }, [itemsByDate, currentMonth]);
-
-  const daysInMonth = getDaysInMonth(currentMonth);
-
-  const handleTodoSave = async (data: { title: string; time: Date; description?: string }) => {
+  const loadCalendarData = useCallback(async () => {
+    setIsLoading(true);
     try {
-      // 보호자 모드인 경우 선택한 이용자 번호 가져오기
+      // 1. 서버 데이터 조회
       const targetNumber = Global.USER_ROLE === 'supporter' && Global.TARGET_NUMBER
         ? Global.TARGET_NUMBER
         : undefined;
 
-      // API 호출: POST /calendar/addEvent
-      await calendarService.addEvent({
-        event: data.title,
-        eventDate: selectedDate,
-        startTime: `${data.time.getHours().toString().padStart(2, '0')}:${data.time.getMinutes().toString().padStart(2, '0')}`,
-      }, targetNumber);
-
-      // 캘린더 데이터 새로고침
       const calendarData = await calendarService.getUserData(targetNumber);
+
+      const allSchedules: Schedule[] = [];
       const allTodos: Todo[] = [];
+      const allLogs: Log[] = [];
 
       calendarData.forEach((dayData) => {
+        dayData.logs.forEach((log) => {
+          allLogs.push({
+            id: log.logId,
+            location: log.location,
+            address: log.locationAddress,
+            arriveTime: log.arriveTime,
+            date: dayData.date,
+            type: 'log',
+          });
+        });
+
+        dayData.geofences.forEach((fence) => {
+          const start = new Date(fence.startTime);
+          const end = new Date(fence.endTime);
+
+          allSchedules.push({
+            id: fence.geofenceId,
+            name: fence.name,
+            address: fence.address,
+            startTime: `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`,
+            endTime: `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`,
+            date: dayData.date,
+            type: 'temporary',
+          });
+        });
+
         dayData.userEvents.forEach((event) => {
           const [hours, minutes] = event.eventStartTime.split(':').map(Number);
           const time = new Date();
@@ -365,7 +285,92 @@ const CalendarPage: React.FC = () => {
         });
       });
 
+      setSchedules(allSchedules);
       setTodos(allTodos);
+      setLogs(allLogs);
+
+      // 2. 로컬 갤러리 데이터 조회 (보호자 모드일 때는 로컬 사진은 안 보임 - 본인 기기 저장소이므로)
+      // 만약 보호자도 사진을 봐야 한다면 서버를 통해야 함. 현재는 로컬 저장소 방식이므로 본인 것만 조회.
+      if (Global.USER_ROLE === 'user') {
+        const galleryData = await galleryService.getPhotos();
+        setPhotos(galleryData);
+      } else {
+        setPhotos([]); // 보호자는 로컬 사진 접근 불가 (추후 서버 연동 필요)
+      }
+
+    } catch (error) {
+      console.error('캘린더 데이터 로드 실패:', error);
+      Alert.alert('오류', '캘린더 데이터를 불러오는 데 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadCalendarData();
+    }, [loadCalendarData])
+  );
+
+  const itemsByDate = useMemo(() => {
+    const map = new Map<string, CalendarItem[]>();
+
+    // 모든 아이템 병합
+    const allItems: any[] = [...logs, ...schedules, ...todos, ...photos];
+
+    allItems.forEach(item => {
+      const date = item.date;
+      const items = map.get(date) || [];
+
+      let typedItem: CalendarItem;
+      if ('location' in item) typedItem = { ...item, itemType: 'log' };
+      else if ('startTime' in item) typedItem = { ...item, itemType: 'schedule' };
+      else if ('time' in item) typedItem = { ...item, itemType: 'todo' };
+      else typedItem = { ...item, itemType: 'photo' };
+
+      map.set(date, [...items, typedItem]);
+    });
+    return map;
+  }, [logs, schedules, todos, photos]);
+
+  const sortedSelectedDateItems = useMemo(() => {
+    const items = itemsByDate.get(selectedDate) || [];
+    return [...items].sort((a, b) => {
+      // 정렬 우선순위: 시간 순 (사진은 시간이 없으므로 마지막이나 생성시간 기준)
+      const getTime = (item: CalendarItem) => {
+        if (item.itemType === 'log') return item.arriveTime;
+        if (item.itemType === 'schedule') return item.startTime;
+        if (item.itemType === 'todo') return item.time.getHours().toString().padStart(2, '0') + ':' + item.time.getMinutes().toString().padStart(2, '0');
+        return '23:59'; // 사진은 시간 정보가 없으면 뒤로 보냄
+      };
+      return getTime(a).localeCompare(getTime(b));
+    });
+  }, [itemsByDate, selectedDate]);
+
+  const hasItemsOnDate = useMemo(() => {
+    const datesWithItems = new Set(itemsByDate.keys());
+    return (day: number): boolean => {
+      const dateStr = `${currentMonth.getFullYear()}-${(currentMonth.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+      return datesWithItems.has(dateStr);
+    };
+  }, [itemsByDate, currentMonth]);
+
+  const daysInMonth = getDaysInMonth(currentMonth);
+
+  const handleTodoSave = async (data: { title: string; time: Date; description?: string }) => {
+    try {
+      const targetNumber = Global.USER_ROLE === 'supporter' && Global.TARGET_NUMBER
+        ? Global.TARGET_NUMBER
+        : undefined;
+
+      await calendarService.addEvent({
+        event: data.title,
+        eventDate: selectedDate,
+        startTime: `${data.time.getHours().toString().padStart(2, '0')}:${data.time.getMinutes().toString().padStart(2, '0')}`,
+      }, targetNumber);
+
+      // 데이터 새로고침
+      loadCalendarData();
       Alert.alert('성공', '할 일이 추가되었습니다.');
     } catch (error) {
       console.error('할 일 추가 실패:', error);
@@ -381,7 +386,6 @@ const CalendarPage: React.FC = () => {
         style: 'destructive',
         onPress: async () => {
           try {
-            // 보호자 모드인 경우 선택한 이용자 번호 가져오기
             const targetNumber = Global.USER_ROLE === 'supporter' && Global.TARGET_NUMBER
               ? Global.TARGET_NUMBER
               : undefined;
@@ -403,6 +407,8 @@ const CalendarPage: React.FC = () => {
       return <LogCard key={`log-${item.id}`} log={item} />;
     } else if (item.itemType === 'schedule') {
       return <ScheduleCard key={`schedule-${item.id}`} schedule={item} />;
+    } else if (item.itemType === 'photo') {
+      return <PhotoCard key={`photo-${item.id}`} photo={item} />;
     } else {
       return <TodoCard key={`todo-${item.id}`} todo={item} onDelete={handleTodoDelete} />;
     }
@@ -411,12 +417,12 @@ const CalendarPage: React.FC = () => {
   return (
     <SafeAreaView className="flex-1 bg-gray-100 pt-safe">
       <StatusBar barStyle="dark-content" backgroundColor="#f3f4f6" />
-      
-      <ScrollView 
+
+      <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        
+
         {/* 헤더 */}
         <View className="px-5 pt-5 pb-4">
           <Text className="text-3xl font-bold text-gray-900">
@@ -435,11 +441,11 @@ const CalendarPage: React.FC = () => {
               className="p-2 rounded-full active:bg-gray-100">
               <Text className="text-xl font-bold text-gray-500">‹</Text>
             </TouchableOpacity>
-            
+
             <Text className="text-lg font-semibold text-gray-900">
               {currentMonth.getFullYear()}년 {currentMonth.getMonth() + 1}월
             </Text>
-            
+
             <TouchableOpacity
               onPress={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
               className="p-2 rounded-full active:bg-gray-100">
@@ -456,28 +462,20 @@ const CalendarPage: React.FC = () => {
             ))}
           </View>
 
-          {/* 날짜 그리드 - 고정된 레이아웃 */}
+          {/* 날짜 그리드 */}
           <View>
-            {/* 주 단위로 렌더링 */}
             {Array.from({ length: Math.ceil(daysInMonth.length / 7) }, (_, weekIndex) => {
               const weekStart = weekIndex * 7;
               const weekDays = daysInMonth.slice(weekStart, weekStart + 7);
-              
+
               return (
                 <View key={weekIndex} style={{ flexDirection: 'row' }}>
                   {weekDays.map((day, dayIndex) => {
                     const index = weekStart + dayIndex;
-                    const dayOfWeekIndex = index % 7;
-                    const dayOfWeekName = ['일', '월', '화', '수', '목', '금', '토'][dayOfWeekIndex];
-                    
                     const dateStr = day ? `${currentMonth.getFullYear()}-${(currentMonth.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}` : '';
                     const isSelected = dateStr === selectedDate;
                     const isToday = dateStr === todayDateStr;
                     const hasItems = day ? hasItemsOnDate(day) : false;
-
-                    if (day === 1) {
-                      console.log(`1일 위치: weekIndex=${weekIndex}, dayIndex=${dayIndex}, 요일=${dayOfWeekName}`);
-                    }
 
                     return (
                       <View
@@ -494,7 +492,6 @@ const CalendarPage: React.FC = () => {
                           <TouchableOpacity
                             onPress={() => setSelectedDate(dateStr)}
                             activeOpacity={0.8}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                             style={{
                               width: '92%',
                               height: '92%',
@@ -540,7 +537,7 @@ const CalendarPage: React.FC = () => {
               <Text className="text-white text-sm font-semibold ml-1">할 일 추가</Text>
             </TouchableOpacity>
           </View>
-          
+
           {sortedSelectedDateItems.length > 0 ? (
             sortedSelectedDateItems.map(item => renderItem({ item }))
           ) : (
@@ -555,7 +552,7 @@ const CalendarPage: React.FC = () => {
       </ScrollView>
 
       <BottomNavigation currentScreen="CalendarPage" />
-      
+
       <TodoModal
         visible={isTodoModalVisible}
         onClose={() => setIsTodoModalVisible(false)}

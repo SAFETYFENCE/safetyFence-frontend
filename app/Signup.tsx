@@ -1,14 +1,10 @@
 import Global from '@/constants/Global';
-import { authService } from '../services/authService';
-import { initializeNotifications } from '../services/notificationService';
-import { storage } from '../utils/storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
-import { Calendar, Check, MapPin, Search, X } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import { Calendar, Check, ChevronLeft, Search, X } from 'lucide-react-native';
+import React, { useState } from 'react';
 import {
   Alert,
-  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -19,8 +15,9 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import styles from '../styles/signupStyles';
+import { authService } from '../services/authService';
 import DaumPostcode, { DaumPostcodeData } from '../utils/DaumPostcode';
+import { storage } from '../utils/storage';
 
 // 인터페이스 정의
 interface FormData {
@@ -37,13 +34,7 @@ interface FormData {
   isElderly: boolean;
 }
 
-type RootStackParamList = {
-  Signup: undefined;
-  SelectRole: undefined;
-};
-
 const SignupPage: React.FC = () => {
-  
   const router = useRouter();
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -102,7 +93,7 @@ const SignupPage: React.FC = () => {
       homeStreetAddress: fullAddress,
       homeAddress: String(data.zonecode),
     }));
-    
+
     // 모달 닫기
     setIsPostcodeMode(false);
   };
@@ -210,9 +201,6 @@ const SignupPage: React.FC = () => {
       await storage.setUserNumber(response.number);
       await storage.setUserName(response.name);
 
-      // 가입 직후 알림 토큰 발급 및 서버 등록 시도
-      await initializeNotifications();
-
       // 성공 알림 및 로그인 페이지로 이동
       Alert.alert(
         "🎉 회원가입 완료",
@@ -239,37 +227,17 @@ const SignupPage: React.FC = () => {
     }
   };
 
-  // 체크박스 컴포넌트
-  const CheckboxItem: React.FC<{
-    id: string;
-    checked: boolean;
-    onPress: () => void;
-    label: string;
-  }> = ({ checked, onPress, label }) => (
-    <TouchableOpacity 
-      style={styles.checkboxContainer}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
-        {checked && <Check size={12} color="white" />}
-      </View>
-      <Text style={styles.checkboxLabel}>{label}</Text>
-    </TouchableOpacity>
-  );
-
-
   // 🔧 다음 우편번호 검색 모드인 경우
   if (isPostcodeMode) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.postcodeHeader}>
-          <Text style={styles.postcodeTitle}>주소 검색</Text>
-          <TouchableOpacity onPress={closeDaumPostcode} style={styles.closeButton}>
-            <X size={24} color="#ffffff" />
+      <SafeAreaView className="flex-1 bg-white">
+        <View className="flex-row items-center justify-between p-4 border-b border-gray-200 bg-white">
+          <Text className="text-lg font-bold text-gray-900">주소 검색</Text>
+          <TouchableOpacity onPress={closeDaumPostcode} className="p-2">
+            <X size={24} color="#111827" />
           </TouchableOpacity>
         </View>
-        <DaumPostcode 
+        <DaumPostcode
           onSubmit={handleDaumPostcode}
           onClose={closeDaumPostcode}
         />
@@ -278,28 +246,39 @@ const SignupPage: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
+    <SafeAreaView className="flex-1 bg-white">
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
+        className="flex-1"
       >
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+        >
           {/* 헤더 */}
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>회원가입</Text>
-            <Text style={styles.headerSubtitle}>
+          <View className="bg-green-500 px-6 pt-6 pb-10 rounded-b-[30px] shadow-sm mb-6">
+            <View className="flex-row items-center justify-center relative mb-2">
+              <TouchableOpacity
+                onPress={() => router.back()}
+                className="absolute left-0 w-10 h-10 items-center justify-center rounded-full bg-white/20"
+                activeOpacity={0.7}
+              >
+                <ChevronLeft size={24} color="white" />
+              </TouchableOpacity>
+              <Text className="text-3xl font-bold text-white">회원가입</Text>
+            </View>
+            <Text className="text-green-100 text-base text-center">
               서비스 이용을 위해 정보를 입력해주세요
             </Text>
           </View>
 
-          <View style={styles.formContainer}>
+          <View className="px-6">
             {/* 이름 */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>
-                이름 <Text style={styles.required}>*</Text>
-              </Text>
+            <View className="mb-5">
+              <Text className="text-gray-600 font-semibold mb-2 ml-1">이름</Text>
               <TextInput
-                style={styles.textInput}
+                className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-gray-900 text-base"
                 placeholder="이름을 입력하세요"
                 value={formData.name}
                 onChangeText={(text) => handleInputChange("name", text)}
@@ -308,17 +287,15 @@ const SignupPage: React.FC = () => {
             </View>
 
             {/* 생년월일 */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>
-                생년월일 <Text style={styles.required}>*</Text>
-              </Text>
+            <View className="mb-5">
+              <Text className="text-gray-600 font-semibold mb-2 ml-1">생년월일</Text>
               <TouchableOpacity
-                style={styles.dateButton}
+                className={`flex-row items-center bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 ${formData.birth ? 'border-green-500 bg-green-50/30' : ''}`}
                 onPress={() => setShowDatePicker(true)}
                 activeOpacity={0.7}
               >
-                <Calendar size={16} color="#6B7280" style={styles.dateIcon} />
-                <Text style={[styles.dateText, formData.birth && styles.dateTextSelected]}>
+                <Calendar size={20} color={formData.birth ? "#22c55e" : "#9CA3AF"} />
+                <Text className={`ml-3 text-base ${formData.birth ? 'text-gray-900' : 'text-gray-400'}`}>
                   {formatDate(formData.birth)}
                 </Text>
               </TouchableOpacity>
@@ -336,13 +313,11 @@ const SignupPage: React.FC = () => {
             </View>
 
             {/* 전화번호 */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>
-                전화번호 <Text style={styles.required}>*</Text>
-              </Text>
+            <View className="mb-5">
+              <Text className="text-gray-600 font-semibold mb-2 ml-1">전화번호</Text>
               <TextInput
-                style={styles.textInput}
-                placeholder="ex) 01012345678"
+                className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-gray-900 text-base"
+                placeholder="숫자만 입력해주세요"
                 value={formData.number}
                 onChangeText={(text) => {
                   const numericText = text.replace(/[^0-9]/g, '');
@@ -355,78 +330,62 @@ const SignupPage: React.FC = () => {
             </View>
 
             {/* 비밀번호 */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>
-                비밀번호 <Text style={styles.required}>*</Text>
-              </Text>
+            <View className="mb-5">
+              <Text className="text-gray-600 font-semibold mb-2 ml-1">비밀번호</Text>
               <TextInput
-                style={styles.textInput}
+                className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-gray-900 text-base mb-3"
                 placeholder="비밀번호를 입력하세요"
                 value={formData.password}
                 onChangeText={(text) => handleInputChange("password", text)}
                 secureTextEntry
                 placeholderTextColor="#9CA3AF"
               />
-            </View>
-
-            {/* 비밀번호 확인 */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>
-                비밀번호 확인 <Text style={styles.required}>*</Text>
-              </Text>
               <TextInput
-                style={styles.textInput}
-                placeholder="비밀번호를 다시 입력하세요"
+                className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-gray-900 text-base"
+                placeholder="비밀번호 확인"
                 value={formData.confirmPassword}
                 onChangeText={(text) => handleInputChange("confirmPassword", text)}
                 secureTextEntry
                 placeholderTextColor="#9CA3AF"
               />
-              {formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword && (
-                <Text style={styles.errorText}>비밀번호가 일치하지 않습니다</Text>
-              )}
-              {formData.password && formData.confirmPassword && formData.password === formData.confirmPassword && (
-                <Text style={styles.successText}>비밀번호가 일치합니다</Text>
+              {formData.password && formData.confirmPassword && (
+                <Text className={`text-xs mt-2 ml-1 ${formData.password === formData.confirmPassword ? 'text-green-600' : 'text-red-500'}`}>
+                  {formData.password === formData.confirmPassword ? '비밀번호가 일치합니다' : '비밀번호가 일치하지 않습니다'}
+                </Text>
               )}
             </View>
 
-            {/* 주소 - 다음 우편번호 API 사용 */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>
-                주소 <Text style={styles.required}>*</Text>
-              </Text>
-              
-              {/* 우편번호 */}
-              <View style={styles.zipCodeRow}>
+            {/* 주소 */}
+            <View className="mb-6">
+              <Text className="text-gray-600 font-semibold mb-2 ml-1">주소</Text>
+
+              <View className="flex-row mb-3">
                 <TextInput
-                  style={[styles.textInput, styles.zipCodeInput]}
+                  className="flex-1 bg-gray-100 border border-gray-200 rounded-2xl px-4 py-3.5 text-gray-500 text-base mr-2"
                   placeholder="우편번호"
                   value={formData.homeAddress}
                   editable={false}
                   placeholderTextColor="#9CA3AF"
                 />
                 <TouchableOpacity
-                  style={styles.searchButton}
+                  className="bg-green-500 px-5 rounded-2xl justify-center items-center shadow-sm"
                   onPress={searchZipCode}
-                  activeOpacity={0.7}
+                  activeOpacity={0.8}
                 >
-                  <Search size={16} color="white" style={styles.searchIcon} />
-                  <Text style={styles.searchButtonText}>검색</Text>
+                  <Search size={20} color="white" />
                 </TouchableOpacity>
               </View>
 
-              {/* 기본주소 */}
               <TextInput
-                style={[styles.textInput, { marginBottom: 12 }]}
+                className="bg-gray-100 border border-gray-200 rounded-2xl px-4 py-3.5 text-gray-500 text-base mb-3"
                 placeholder="기본주소"
                 value={formData.homeStreetAddress}
                 editable={false}
                 placeholderTextColor="#9CA3AF"
               />
 
-              {/* 상세주소 */}
               <TextInput
-                style={styles.textInput}
+                className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-gray-900 text-base"
                 placeholder="상세주소를 입력하세요"
                 value={formData.homeStreetAddressDetail}
                 onChangeText={(text) => handleInputChange("homeStreetAddressDetail", text)}
@@ -435,10 +394,9 @@ const SignupPage: React.FC = () => {
             </View>
 
             {/* 이용자 구분 */}
-            <View style={styles.inputGroup}>
-              <CheckboxItem
-                id="elderly"
-                checked={formData.isElderly}
+            <View className="mb-8">
+              <TouchableOpacity
+                className={`flex-row items-center p-4 rounded-2xl border ${formData.isElderly ? 'bg-green-50 border-green-500' : 'bg-gray-50 border-gray-200'}`}
                 onPress={() => {
                   const newValue = !formData.isElderly;
                   handleInputChange("isElderly", newValue);
@@ -450,59 +408,54 @@ const SignupPage: React.FC = () => {
                     }));
                   }
                 }}
-                label="노인 이용자입니다"
-              />
+                activeOpacity={0.9}
+              >
+                <View className={`w-6 h-6 rounded-full border items-center justify-center mr-3 ${formData.isElderly ? 'bg-green-500 border-green-500' : 'bg-white border-gray-300'}`}>
+                  {formData.isElderly && <Check size={14} color="white" />}
+                </View>
+                <Text className={`text-base font-medium ${formData.isElderly ? 'text-green-800' : 'text-gray-600'}`}>
+                  노인 이용자입니다
+                </Text>
+              </TouchableOpacity>
 
               {/* 센터 주소 */}
               {formData.isElderly && (
-                <View style={styles.elderlySection}>
-                  <Text style={styles.label}>
-                    센터 주소 <Text style={styles.required}>*</Text>
-                  </Text>
-
-                  <View style={styles.zipCodeRow}>
+                <View className="mt-4 pl-2 border-l-2 border-green-200 ml-4">
+                  <Text className="text-gray-600 font-semibold mb-2 ml-1">센터 주소</Text>
+                  <View className="flex-row mb-3">
                     <TextInput
-                      style={[styles.textInput, styles.zipCodeInput]}
+                      className="flex-1 bg-gray-100 border border-gray-200 rounded-2xl px-4 py-3.5 text-gray-500 text-base mr-2"
                       placeholder="우편번호"
                       value={formData.centerAddress}
                       editable={false}
                       placeholderTextColor="#9CA3AF"
                     />
                     <TouchableOpacity
-                      style={styles.searchButton}
+                      className="bg-green-500 px-5 rounded-2xl justify-center items-center shadow-sm"
                       onPress={searchCenterZipCode}
-                      activeOpacity={0.7}
+                      activeOpacity={0.8}
                     >
-                      <Search size={16} color="white" style={styles.searchIcon} />
-                      <Text style={styles.searchButtonText}>검색</Text>
+                      <Search size={20} color="white" />
                     </TouchableOpacity>
                   </View>
-
                   <TextInput
-                    style={[styles.textInput, { marginBottom: 0 }]}
-                    placeholder="기본주소"
+                    className="bg-gray-100 border border-gray-200 rounded-2xl px-4 py-3.5 text-gray-500 text-base"
+                    placeholder="센터 주소"
                     value={formData.centerStreetAddress}
                     editable={false}
                     placeholderTextColor="#9CA3AF"
                   />
-
-                  {formData.isElderly && !formData.centerAddress && (
-                    <Text style={styles.warningText}>
-                      노인 이용자는 센터 주소 입력이 필요합니다
-                    </Text>
-                  )}
                 </View>
               )}
             </View>
 
-
             {/* 회원가입 버튼 */}
             <TouchableOpacity
-              style={[styles.submitButton, styles.submitButtonActive]}
+              className="bg-green-600 py-4 rounded-2xl shadow-lg shadow-green-200 mb-8 active:bg-green-700"
               onPress={handleSubmit}
               activeOpacity={0.8}
             >
-              <Text style={[styles.submitButtonText, styles.submitButtonTextActive]}>
+              <Text className="text-white text-center font-bold text-lg">
                 회원가입 완료
               </Text>
             </TouchableOpacity>
@@ -512,11 +465,11 @@ const SignupPage: React.FC = () => {
         {/* 센터 주소 검색 모달 */}
         {isCenterPostcodeMode && (
           <Modal visible={true} animationType="slide">
-            <SafeAreaView style={styles.container}>
-              <View style={styles.postcodeHeader}>
-                <Text style={styles.postcodeTitle}>센터 주소 검색</Text>
-                <TouchableOpacity onPress={closeCenterDaumPostcode} style={styles.closeButton}>
-                  <X size={24} color="#ffffff" />
+            <SafeAreaView className="flex-1 bg-white">
+              <View className="flex-row items-center justify-between p-4 border-b border-gray-200">
+                <Text className="text-lg font-bold text-gray-900">센터 주소 검색</Text>
+                <TouchableOpacity onPress={closeCenterDaumPostcode} className="p-2">
+                  <X size={24} color="#111827" />
                 </TouchableOpacity>
               </View>
               <DaumPostcode

@@ -1,7 +1,7 @@
 import Global from '@/constants/Global';
 import { useLocation } from '@/contexts/LocationContext';
 import { useRouter } from 'expo-router';
-import { ArrowRight, User, Users } from 'lucide-react-native';
+import { User, Users } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   Alert,
@@ -50,118 +50,101 @@ export default function SelectRolePage() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50 pt-safe">
-      <View className="flex-1 justify-center px-4">
-        {/* 메인 카드 */}
-        <View className="bg-white rounded-lg shadow-sm p-6 mx-4">
-          {/* 헤더 */}
-          <View className="text-center mb-6">
-            <Text className="text-2xl font-bold text-gray-900 text-center mb-2">
-              환영합니다!
-            </Text>
-            <Text className="text-lg text-gray-600 text-center leading-6">
-              서비스 이용을 위해 역할을 선택해주세요.
-            </Text>
-          </View>
+    <SafeAreaView className="flex-1 bg-white">
+      <View className="flex-1">
+        {/* 헤더 */}
+        <View className="bg-green-500 px-6 pt-16 pb-12 rounded-b-[40px] shadow-sm mb-8 items-center">
+          <Text className="text-3xl font-bold text-white mb-2 tracking-tight text-center">
+            환영합니다!
+          </Text>
+          <Text className="text-green-100 text-base font-medium text-center">
+            서비스 이용을 위해 역할을 선택해주세요
+          </Text>
+        </View>
 
-          {/* 역할 선택 카드들 */}
-          <View className="space-y-4 mb-6">
+        {/* 역할 선택 카드들 - 화면 중앙 정렬 */}
+        <View className="px-6 py-5 flex-1">
+          <View className="space-y-4">
             {/* 이용자 카드 */}
             <TouchableOpacity
               onPress={() => handleRoleSelect('user')}
-              className={`border-2 rounded-lg p-6 ${
-                selectedRole === 'user'
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 bg-white'
-              }`}
+              className={`flex-row items-center p-6 rounded-2xl border-2 ${selectedRole === 'user'
+                ? 'border-green-500 bg-green-50 shadow-md'
+                : 'border-gray-100 bg-white shadow-sm'
+                }`}
               activeOpacity={0.7}
             >
-              <View className="flex-row items-center space-x-4">
-                <View
-                  className={`h-12 w-12 rounded-full items-center justify-center ${
-                    selectedRole === 'user' ? 'bg-blue-100' : 'bg-gray-100'
+              <View
+                className={`h-14 w-14 rounded-full items-center justify-center mr-4 ${selectedRole === 'user' ? 'bg-green-100' : 'bg-gray-100'
                   }`}
-                >
-                  <User
-                    size={24}
-                    color={selectedRole === 'user' ? '#2563eb' : '#6b7280'}
-                  />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-lg font-semibold text-gray-900">
-                    이용자
-                  </Text>
-                  <Text className="text-xs text-gray-600 mt-1">
-                    서비스를 직접 이용하는 노인 이용자
-                  </Text>
-                  <Text className="text-[10px] text-blue-600 mt-1">
-                    • 내 위치 확인 • 활동 로그 • 마이페이지
-                  </Text>
-                </View>
-                {selectedRole === 'user' && (
-                  <ArrowRight size={20} color="#2563eb" />
-                )}
+              >
+                <User
+                  size={28}
+                  color={selectedRole === 'user' ? '#16a34a' : '#9ca3af'}
+                />
+              </View>
+              <View className="flex-1">
+                <Text className={`text-2xl font-bold mb-2 ${selectedRole === 'user' ? 'text-green-800' : 'text-gray-900'}`}>
+                  이용자
+                </Text>
+                <Text className="text-lg text-gray-500 leading-6">
+                  서비스를 직접 이용하는{'\n'}노인 이용자
+                </Text>
+              </View>
+              <View className={`w-6 h-6 rounded-full border-2 items-center justify-center ${selectedRole === 'user' ? 'border-green-500 bg-green-500' : 'border-gray-300'}`}>
+                {selectedRole === 'user' && <View className="w-2.5 h-2.5 rounded-full bg-white" />}
               </View>
             </TouchableOpacity>
-
-            <Text>{' '}</Text>
 
             {/* 보호자 카드 */}
             <TouchableOpacity
               onPress={() => handleRoleSelect('supporter')}
-              className={`border-2 rounded-lg p-6 ${
-                selectedRole === 'supporter'
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-200 bg-white'
-              }`}
+              className={`flex-row items-center p-6 rounded-2xl border-2 mt-4 ${selectedRole === 'supporter'
+                ? 'border-green-500 bg-green-50 shadow-md'
+                : 'border-gray-100 bg-white shadow-sm'
+                }`}
               activeOpacity={0.7}
             >
-              <View className="flex-row items-center space-x-4">
-                <View
-                  className={`h-12 w-12 rounded-full items-center justify-center ${
-                    selectedRole === 'supporter' ? 'bg-green-100' : 'bg-gray-100'
+              <View
+                className={`h-14 w-14 rounded-full items-center justify-center mr-4 ${selectedRole === 'supporter' ? 'bg-green-100' : 'bg-gray-100'
                   }`}
-                >
-                  <Users
-                    size={24}
-                    color={selectedRole === 'supporter' ? '#16a34a' : '#6b7280'}
-                  />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-lg font-semibold text-gray-900">
-                    보호자
-                  </Text>
-                  <Text className="text-xs text-gray-600 mt-1">
-                    이용자를 돌보는 가족 또는 보호자
-                  </Text>
-                  <Text className="text-[10px] text-green-600 mt-1">
-                    • 지도 검색 • 이용자 관리 • 알림 • 로그
-                  </Text>
-                </View>
-                {selectedRole === 'supporter' && (
-                  <ArrowRight size={20} color="#16a34a" />
-                )}
+              >
+                <Users
+                  size={28}
+                  color={selectedRole === 'supporter' ? '#16a34a' : '#9ca3af'}
+                />
+              </View>
+              <View className="flex-1">
+                <Text className={`text-2xl font-bold mb-2 ${selectedRole === 'supporter' ? 'text-green-800' : 'text-gray-900'}`}>
+                  보호자
+                </Text>
+                <Text className="text-lg text-gray-500 leading-6">
+                  이용자를 돌보는{'\n'}가족 또는 보호자
+                </Text>
+              </View>
+              <View className={`w-6 h-6 rounded-full border-2 items-center justify-center ${selectedRole === 'supporter' ? 'border-green-500 bg-green-500' : 'border-gray-300'}`}>
+                {selectedRole === 'supporter' && <View className="w-2.5 h-2.5 rounded-full bg-white" />}
               </View>
             </TouchableOpacity>
           </View>
+        </View>
 
-          {/* 계속하기 버튼 */}
+        {/* 계속하기 버튼 - 위로 2cm 올림 */}
+        <View className="px-6 pb-20">
           <TouchableOpacity
             onPress={handleContinue}
             disabled={!selectedRole}
-            className={`py-4 rounded-lg ${
-              selectedRole
-                ? 'bg-green-500 active:bg-white-700'
-                : 'bg-gray-300'
-            }`}
+            className={`w-full py-4 rounded-2xl items-center justify-center shadow-lg ${selectedRole
+              ? 'bg-green-600 shadow-green-200 active:bg-green-700'
+              : 'bg-gray-200'
+              }`}
             activeOpacity={selectedRole ? 0.8 : 1}
           >
             <Text
-              className={`text-center text-lg font-medium ${
-                selectedRole ? 'text-white' : 'text-gray-500'
-              }`}
+              className={`text-lg font-bold ${selectedRole ? 'text-white' : 'text-gray-400'
+                }`}
             >
-              {selectedRole === 'user' ? '이용자로 시작하기' : selectedRole === 'supporter' ? '보호자로 시작하기' : '시작하기'}
+              {selectedRole === 'user' ? '이용자로 시작하기' : selectedRole === 'supporter' ? '보호자로 시작하기' : '역할을 선택해주세요'}
             </Text>
           </TouchableOpacity>
         </View>

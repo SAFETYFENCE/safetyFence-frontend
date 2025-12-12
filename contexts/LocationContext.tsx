@@ -27,7 +27,9 @@ import { startBackgroundLocationTracking, stopBackgroundLocationTracking } from 
 import { geofenceService } from '../services/geofenceService';
 import { sendLocationUpdate } from '../services/locationTransport';
 import { websocketService } from '../services/websocketService';
-import { initializeNotifications, setupNotificationListeners, cleanupNotificationListeners } from '../services/notificationService';
+import { setupNotificationListeners, cleanupNotificationListeners } from '../services/notificationService';
+import { checkGeofenceEntry } from '../utils/geofenceUtils';
+import { storage } from '../utils/storage';
 import type { GeofenceItem } from '../types/api';
 
 // 위치 데이터 타입
@@ -455,6 +457,12 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
 
       const data = await geofenceService.getList(targetNumber);
       setGeofences(data);
+
+      // 백그라운드를 위한 캐시 저장 (이용자만)
+      if (Global.USER_ROLE === 'user') {
+        await storage.setGeofenceCache(data);
+      }
+
       console.log(`✅ 지오펜스 목록 로드 성공: ${data.length}개 (${Global.USER_ROLE === 'supporter' ? `이용자: ${targetNumber}` : '본인'})`);
     } catch (error) {
       console.error('❌ 지오펜스 목록 로드 실패:', error);
@@ -468,6 +476,22 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
   useEffect(() => {
     currentLocationRef.current = currentLocation;
   }, [currentLocation]);
+
+  /**
+   * AsyncStorage에서 초기 진입 상태 로드 (이용자만)
+   */
+  useEffect(() => {
+    if (Global.USER_ROLE !== 'user') return;
+
+    const initEntryState = async () => {
+      const saved = await storage.getGeofenceEntryState();
+      setLastGeofenceCheck(saved);
+      lastGeofenceCheckRef.current = saved;
+      console.log('📍 지오펜스 진입 상태 로드 완료:', saved);
+    };
+
+    initEntryState();
+  }, []);
 
   /**
    * WebSocket으로 위치 전송 (이용자만)
@@ -520,6 +544,9 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', async (nextAppState) => {
       try {
+        // 앱 상태를 AsyncStorage에 저장 (백그라운드 Task가 읽을 수 있도록)
+        await storage.setItem('appState', nextAppState);
+
         // inactive 상태는 무시 (잠깐 멈춤일 뿐)
         if (nextAppState === 'inactive') {
           appState.current = nextAppState;
@@ -659,97 +686,55 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
       return;
     }
 
-    // Haversine 공식으로 거리 계산 (미터 단위)
-    const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-      const R = 6371000; // 지구 반지름 (미터)
-      const dLat = ((lat2 - lat1) * Math.PI) / 180;
-      const dLon = ((lon2 - lon1) * Math.PI) / 180;
-      const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos((lat1 * Math.PI) / 180) *
-          Math.cos((lat2 * Math.PI) / 180) *
-          Math.sin(dLon / 2) *
-          Math.sin(dLon / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      return R * c;
-    };
-
-    const checkGeofenceEntry = async () => {
+    const checkAndRecordGeofenceEntry = async () => {
       const location = currentLocationRef.current;
       if (!location) return;
 
-      const currentLat = location.latitude;
-      const currentLng = location.longitude;
-      const now = new Date();
+      // AsyncStorage에서 현재 상태 읽기 (백그라운드와 동기화)
+      const entryState = await storage.getGeofenceEntryState();
 
-      const parseDateTime = (value: string | null): Date | null => {
-        if (!value) return null;
-        const normalized = value.replace(' ', 'T').replace(/\.\d+$/, '');
-        const parsed = new Date(normalized);
-        return isNaN(parsed.getTime()) ? null : parsed;
-      };
+      // 유틸리티 함수 호출
+      const result = checkGeofenceEntry(
+        location.latitude,
+        location.longitude,
+        geofences,
+        entryState
+      );
 
-      // 시간 체크 헬퍼 함수 (시작·종료 날짜/시간 모두 고려)
-      const isWithinTimeRange = (startTime: string | null, endTime: string | null): boolean => {
-        if (!startTime || !endTime) return true; // 시간 미설정 시 항상 활성
+      // 진입 처리
+      for (const entry of result.entries) {
+        // ⚠️ 중요: API 호출 전에 먼저 entryState 저장 (race condition 방지)
+        entryState[entry.geofenceId] = true;
+        await storage.setGeofenceEntryState(entryState);
+        setLastGeofenceCheck({ ...entryState });
+        lastGeofenceCheckRef.current = entryState;
 
-        const start = parseDateTime(startTime);
-        const end = parseDateTime(endTime);
-
-        if (!start || !end) {
-          // 파싱 실패 시 시간 조건을 무시하고 활성 처리
-          return true;
+        try {
+          await geofenceService.recordEntry({ geofenceId: entry.geofenceId });
+          console.log(`✅ 지오펜스 진입 기록: ${entry.name}`);
+        } catch (error) {
+          // 일시형 지오펜스가 이미 삭제되었거나 중복 요청인 경우
+          console.warn(`⚠️ 지오펜스 진입 기록 실패 (이미 처리됨): ${entry.name}`, error);
         }
+      }
 
-        return now >= start && now <= end;
-      };
-
-      for (const fence of geofences) {
-        // 1. 거리 체크
-        const distance = calculateDistance(currentLat, currentLng, fence.latitude, fence.longitude);
-        const radius = 100; // 기본 반경 200미터
-        const isInside = distance <= radius;
-
-        // 2. 시간 체크 (일시적 지오펜스만)
-        const isTimeActive = fence.type === 0 || isWithinTimeRange(fence.startTime, fence.endTime);
-
-        // 3. 진입 조건: 거리 내 + 시간 조건 만족
-        const canEnter = isInside && isTimeActive;
-
-        // 진입 감지: 이전에 밖에 있었는데 지금 안에 들어옴
-        if (canEnter && !lastGeofenceCheckRef.current[fence.id]) {
-          try {
-            await geofenceService.recordEntry({ geofenceId: fence.id });
-            console.log(`✅ 지오펜스 진입 기록: ${fence.name} (${fence.type === 0 ? '영구' : `일시 ${fence.startTime}-${fence.endTime}`})`);
-    setLastGeofenceCheck(prev => {
-      const updated = { ...prev, [fence.id]: true };
-      lastGeofenceCheckRef.current = updated;
-      return updated;
-    });
-          } catch (error) {
-            console.error('❌ 지오펜스 진입 기록 실패:', error);
-          }
-        }
-        // 이탈 감지: 영구 지오펜스만 이탈 추적 (일시적 지오펜스는 진입 후 사라짐)
-        else if (fence.type === 0 && (!canEnter) && lastGeofenceCheckRef.current[fence.id]) {
-          console.log(`🚪 영구 지오펜스 이탈: ${fence.name}`);
-          setLastGeofenceCheck(prev => {
-            const updated = { ...prev };
-            delete updated[fence.id];
-            lastGeofenceCheckRef.current = updated;
-            return updated;
-          });
-        }
+      // 이탈 처리 (영구 지오펜스만)
+      for (const exit of result.exits) {
+        console.log(`🚪 영구 지오펜스 이탈: ${exit.name}`);
+        delete entryState[exit.geofenceId];
+        await storage.setGeofenceEntryState(entryState);
+        setLastGeofenceCheck({ ...entryState });
+        lastGeofenceCheckRef.current = entryState;
       }
     };
 
     // 10초마다 지오펜스 검사
     const geofenceCheckInterval = setInterval(() => {
-      checkGeofenceEntry();
+      checkAndRecordGeofenceEntry();
     }, 10000);
 
     // 초기 검사 (즉시 실행)
-    checkGeofenceEntry();
+    checkAndRecordGeofenceEntry();
 
     console.log('🔍 지오펜스 검사 시작 (10초 주기, 항상 실행)');
 
@@ -766,7 +751,10 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
     let notificationListeners: any = null;
 
     const initNotifications = async () => {
-      await initializeNotifications();
+      // 초기 앱 상태 저장 (백그라운드 Task가 읽을 수 있도록)
+      await storage.setItem('appState', AppState.currentState);
+
+      // 알림 리스너만 설정 (토큰 발급은 로그인 시 처리)
       notificationListeners = setupNotificationListeners();
     };
 

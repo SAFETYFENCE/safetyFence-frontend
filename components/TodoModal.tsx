@@ -1,3 +1,4 @@
+import * as ImagePicker from 'expo-image-picker';
 import { ChevronDown, ChevronUp, Clock, Paperclip, X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
@@ -11,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
+import { galleryService } from '../services/galleryService';
 
 interface TodoData {
   title: string;
@@ -67,7 +68,7 @@ const TodoModal: React.FC<TodoModalProps> = ({
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.title.trim()) {
       Alert.alert('입력 오류', '할 일 제목을 입력해주세요.');
       return;
@@ -76,6 +77,21 @@ const TodoModal: React.FC<TodoModalProps> = ({
     const dateToSave = new Date();
     dateToSave.setHours(parseInt(time.hours, 10));
     dateToSave.setMinutes(parseInt(time.minutes, 10));
+
+    // 사진이 있으면 갤러리 서비스에 저장
+    if (formData.image) {
+      try {
+        await galleryService.addPhoto({
+          uri: formData.image,
+          date: selectedDate,
+          title: formData.title,
+          description: formData.description,
+        });
+        console.log('사진 갤러리에 저장 완료');
+      } catch (error) {
+        console.error('사진 저장 실패:', error);
+      }
+    }
 
     onSave({
       ...formData,
@@ -95,11 +111,11 @@ const TodoModal: React.FC<TodoModalProps> = ({
 
       if (newValue < 0) newValue = max - (unit === 'minutes' ? step - 1 : 0);
       if (newValue > max) newValue = 0;
-      
+
       return { ...prev, [unit]: newValue.toString().padStart(2, '0') };
     });
   };
-  
+
   const handleTimeChange = (unit: 'hours' | 'minutes', text: string) => {
     const num = text.replace(/[^0-9]/g, '');
     if (num === '') {

@@ -46,25 +46,25 @@ const HTML_CONTENT = `
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #f0fdf4; }
     #map { width: 100%; height: 100%; background-color: #e5e7eb; } 
     .my-marker {
-      width: 30px;
-      height: 30px;
-      background-color: #5af63bff;
-      border: 3px solid white;
+      width: 40px;
+      height: 40px;
+      background-color: #fc6868ff;
+      /* border: 3px solid white; Removed border */
       border-radius: 50% 50% 50% 0;
       transform: rotate(-45deg);
       box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
       position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-    .my-marker::after {
-      content: '';
-      width: 10px;
-      height: 10px;
-      background-color: white;
-      border-radius: 50%;
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+    .my-marker .icon {
+      transform: rotate(45deg); /* Counter-rotate to make icon upright */
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .target-marker {
       width: 24px;
@@ -74,10 +74,76 @@ const HTML_CONTENT = `
       border-radius: 50%;
       box-shadow: 0 0 5px rgba(0,0,0,0.3);
     }
-    .customoverlay { position:relative;bottom:45px;border-radius:6px;border: 1px solid #ccc;border-bottom:2px solid #ddd;float:left; }
-    .customoverlay:nth-of-type(n) { border:0; box-shadow:0px 1px 2px #888; }
-    .customoverlay .title { display:block;text-align:center;background:#fff;padding:5px 10px;font-size:12px;font-weight:bold; }
-    .customoverlay:after { content:'';position:absolute;margin-left:-12px;left:50%;bottom:-12px;width:22px;height:12px;background:url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/vertex_white.png') }
+    .customoverlay { 
+      position: relative; 
+      bottom: 25px; /* Reduced from 35px to bring closer */
+      border-radius: 20px; 
+      border: 2px solid #ffffff; 
+      background: #22c55e; 
+      float: left; 
+      display: flex;
+      align-items: center;
+      padding: 5px 10px;
+      box-shadow: 0px 2px 4px rgba(0,0,0,0.2);
+    }
+    .customoverlay:nth-of-type(n) { border: 2px solid #ffffff; }
+    .customoverlay .icon-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 4px;
+    }
+    .customoverlay .title { 
+      display: block; 
+      text-align: center; 
+      color: #ffffff; 
+      font-size: 13px; 
+      font-weight: bold; 
+    }
+    .customoverlay:after { 
+      content: ''; 
+      position: absolute; 
+      margin-left: -5px; /* Adjusted for narrower width */
+      left: 50%; 
+      bottom: -10px; /* Adjusted for longer height */
+      width: 0; 
+      height: 0; 
+      border-left: 5px solid transparent; /* Narrower */
+      border-right: 5px solid transparent; /* Narrower */
+      border-top: 10px solid #22c55e; /* Longer/Sharper */
+    }
+    .geofence-pin {
+      width: 24px;
+      height: 24px;
+      background-color: #22c55e;
+      border: 2px solid white;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+      position: relative;
+    }
+    .geofence-pin::after {
+      content: '';
+      width: 4px;
+      height: 4px;
+      background-color: white;
+      border-radius: 50%;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    /* Temporary Geofence Styles (Orange) */
+    .customoverlay.temporary {
+      background: #ffb37cff; /* Orange */
+    }
+    .customoverlay.temporary:after {
+      border-top-color: #ffba88ff;
+    }
+    .geofence-pin.temporary {
+      background-color: #ffbb8bff;
+    }
   </style>
 </head>
 <body>
@@ -157,7 +223,11 @@ const HTML_CONTENT = `
         const locPosition = new kakao.maps.LatLng(currentLocation.latitude, currentLocation.longitude);
         
         if (!myLocationMarker) {
-          const content = '<div class="my-marker"></div>';
+          const content = '<div class="my-marker">' + 
+            '<div class="icon">' +
+            '<svg width="20" height="20" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>' +
+            '</div>' +
+            '</div>';
           myLocationMarker = new kakao.maps.CustomOverlay({
             position: locPosition,
             content: content,
@@ -207,7 +277,25 @@ const HTML_CONTENT = `
           geofenceCircles.push(circle);
 
           // Marker (Custom Overlay for click)
-          const content = '<div class="customoverlay">' +
+          let iconSvg = '';
+          // 이름에 따라 아이콘 결정 (집, 병원 등)
+          if (gf.name.includes('집')) {
+             // House Icon
+             iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>';
+          } else if (gf.name.includes('병원')) {
+             // Hospital (Plus) Icon
+             iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+          } else {
+             // Default Pin Icon
+             iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>';
+          }
+
+          // Check if temporary (type 1 or 'temporary')
+          const isTemporary = gf.type === 1 || gf.type === 'temporary';
+          const typeClass = isTemporary ? ' temporary' : '';
+
+          const content = '<div class="customoverlay' + typeClass + '">' +
+            '  <div class="icon-wrapper">' + iconSvg + '</div>' +
             '  <span class="title">' + gf.name + '</span>' +
             '</div>';
             
@@ -219,19 +307,15 @@ const HTML_CONTENT = `
           overlay.setMap(map);
           geofenceMarkers.push(overlay);
           
-          const marker = new kakao.maps.Marker({
+          // Custom Pin Marker (Green/Orange)
+          const pinContent = '<div class="geofence-pin' + typeClass + '"></div>';
+          const pinOverlay = new kakao.maps.CustomOverlay({
             position: gfPosition,
-            opacity: 0 // Invisible marker for click detection
+            content: pinContent,
+            yAnchor: 0.5
           });
-          marker.setMap(map);
-          geofenceMarkers.push(marker);
-
-          kakao.maps.event.addListener(marker, 'click', function() {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'GEOFENCE_CLICK',
-              payload: { id: gf.id, name: gf.name }
-            }));
-          });
+          pinOverlay.setMap(map);
+          geofenceMarkers.push(pinOverlay);
         });
       }
 

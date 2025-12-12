@@ -1,5 +1,4 @@
 import Global from '@/constants/Global';
-import { Image } from "react-native";
 import { useNavigation } from '@react-navigation/native';
 import {
   ChevronDown,
@@ -12,7 +11,7 @@ import {
   Trash2,
   User
 } from 'lucide-react-native';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -27,8 +26,8 @@ import {
 import BottomNavigation from '../components/BottomNavigation';
 import { geofenceService } from '../services/geofenceService';
 import { userService } from '../services/userService';
+import type { MyPageData } from '../types/api';
 import { storage } from '../utils/storage';
-import type { MyPageData, MyPageGeofence } from '../types/api';
 
 // 타입 정의
 interface PasswordData {
@@ -240,28 +239,28 @@ const MyPage: React.FC = () => {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-gray-50 justify-center items-center">
-        <ActivityIndicator size="large" color="#2563EB" />
-        <Text className="mt-3">사용자 정보를 불러오는 중입니다...</Text>
+      <SafeAreaView className="flex-1 bg-white justify-center items-center">
+        <ActivityIndicator size="large" color="#22c55e" />
+        <Text className="mt-3 text-gray-500">사용자 정보를 불러오는 중입니다...</Text>
       </SafeAreaView>
     );
   }
 
   if (error && !userData) {
     return (
-      <SafeAreaView className="flex-1 bg-gray-50 justify-center items-center p-4">
+      <SafeAreaView className="flex-1 bg-white justify-center items-center p-4">
         <Text className="text-base text-red-600 mb-3">오류: {error}</Text>
         <TouchableOpacity
           onPress={fetchUserData}
-          className="bg-blue-600 px-4 py-2 rounded-md"
+          className="bg-green-600 px-6 py-3 rounded-2xl"
         >
-          <Text className="text-white">다시 시도</Text>
+          <Text className="text-white font-bold">다시 시도</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          className="mt-3 bg-gray-200 px-4 py-2 rounded-md"
+          className="mt-3 bg-gray-100 px-6 py-3 rounded-2xl"
         >
-          <Text>이전 화면으로</Text>
+          <Text className="text-gray-600">이전 화면으로</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -269,200 +268,194 @@ const MyPage: React.FC = () => {
 
   if (!userData) {
     return (
-      <SafeAreaView className="flex-1 bg-gray-50 justify-center items-center">
-        <Text>사용자 정보를 불러올 수 없습니다.</Text>
+      <SafeAreaView className="flex-1 bg-white justify-center items-center">
+        <Text className="text-gray-500">사용자 정보를 불러올 수 없습니다.</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50 pt-safe">
-      <ScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-        <View className="w-full max-w-2xl mx-auto space-y-8">
-          {/* 헤더 */}
-          <View className="flex-row items-center justify-center py-4">
-            <Text className="text-2xl font-bold text-gray-900">마이페이지</Text>
+    <SafeAreaView className="flex-1 bg-white pt-safe">
+      <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+        {/* 헤더 */}
+        <View className="bg-green-500 px-6 pt-8 pb-10 rounded-b-[40px] shadow-sm mb-6">
+          <View className="flex-row items-center justify-center mb-6">
+            <Text className="text-2xl font-bold text-white">마이페이지</Text>
           </View>
 
-          {/* 프로필 카드 */}
-          <Card className="mb-4">
-            <CardHeader>
-              <View className="flex-row items-center">
-                <User size={20} color="#6B7280" />
-                <Text className="ml-2 text-lg font-semibold">프로필 정보</Text>
-              </View>
-            </CardHeader>
-            <CardContent>
-              <View className="flex-row items-center space-x-4 mb-6 pb-4 border-b border-gray-100">
-                <View className="flex-1">
-                  <Text className="text-2xl font-bold text-gray-900">{userData.name}</Text>
-                  <View className="mt-1">
-                    <Badge>
-                      {Global.USER_ROLE === 'supporter' ? '보호자' : '이용자'}
-                    </Badge>
-                  </View>
+          <View className="flex-row items-center bg-white/10 p-4 rounded-3xl backdrop-blur-sm">
+            <View className="w-16 h-16 rounded-full bg-white items-center justify-center mr-4">
+              <User size={32} color="#22c55e" />
+            </View>
+            <View>
+              <View className="flex-row items-center mb-1">
+                <Text className="text-2xl font-bold text-white mr-2">{userData.name}</Text>
+                <View className="bg-white/20 px-2 py-0.5 rounded-full">
+                  <Text className="text-xs text-white font-medium">
+                    {Global.USER_ROLE === 'supporter' ? '보호자' : '이용자'}
+                  </Text>
                 </View>
               </View>
+              <Text className="text-green-100 text-sm">
+                {Global.USER_ROLE === 'supporter' ? '이용자를 안전하게 보호하고 있습니다' : '안전한 하루 되세요!'}
+              </Text>
+            </View>
+          </View>
+        </View>
 
-              <View className="space-y-2">
-                <ProfileItem label="이름" value={userData.name} icon={<User size={18} color="#6B7280" />} />
-                <ProfileItem label="생년월일" value={userData.birth} icon={<Text className="text-lg">🎂</Text>} />
-                <ProfileItem label="우편번호" value={userData.homeAddress} icon={<MapPin size={18} color="#6B7280" />} />
-
-                {Global.USER_ROLE === 'user' && (
-                  <>
-                    <ProfileItem label="센터 우편번호" value={userData.centerAddress} icon={<Text className="text-lg">🏥</Text>} />
-                    <ProfileItem label="링크 코드" value={userData.linkCode} icon={<Text className="text-lg">🔗</Text>} />
-                  </>
-                )}
+        <View className="px-5">
+          {/* 프로필 정보 카드 */}
+          <View className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 mb-5">
+            <View className="flex-row items-center mb-4">
+              <View className="w-8 h-8 rounded-full bg-green-50 items-center justify-center mr-2">
+                <User size={16} color="#16a34a" />
               </View>
-            </CardContent>
-          </Card>
+              <Text className="text-lg font-bold text-gray-900">기본 정보</Text>
+            </View>
+
+            <View className="space-y-4">
+              <ProfileItem label="생년월일" value={userData.birth} icon={<Text className="text-lg">🎂</Text>} />
+              <ProfileItem label="우편번호" value={userData.homeAddress} icon={<MapPin size={18} color="#9ca3af" />} />
+              {Global.USER_ROLE === 'user' && (
+                <>
+                  <ProfileItem label="센터 우편번호" value={userData.centerAddress} icon={<Text className="text-lg">🏥</Text>} />
+                  <ProfileItem label="링크 코드" value={userData.linkCode} icon={<Text className="text-lg">🔗</Text>} />
+                </>
+              )}
+            </View>
+          </View>
 
           {/* 등록된 영역 리스트 */}
-          <Card className="mb-4">
-            <CardHeader>
+          <View className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 mb-5">
+            <View className="flex-row items-center justify-between mb-4">
               <View className="flex-row items-center">
-                <MapPin size={20} color="#6B7280" />
-                <Text className="ml-2 text-lg font-semibold text-gray-900">
+                <View className="w-8 h-8 rounded-full bg-green-50 items-center justify-center mr-2">
+                  <MapPin size={16} color="#16a34a" />
+                </View>
+                <Text className="text-lg font-bold text-gray-900">
                   {Global.USER_ROLE === 'supporter' && Global.TARGET_NUMBER
-                    ? `${Global.TARGET_RELATION || Global.TARGET_NUMBER}의 영역 리스트`
-                    : '등록된 영역 리스트'}
+                    ? `${Global.TARGET_RELATION || Global.TARGET_NUMBER}의 영역`
+                    : '등록된 영역'}
                 </Text>
               </View>
-            </CardHeader>
-            <CardContent>
-              {userData.geofences && userData.geofences.length > 0 ? (
-                <>
-                  <View>
-                    {(isGeofenceListExpanded
-                      ? userData.geofences
-                      : userData.geofences.slice(0, 2)
-                    ).map((geofence, idx, arr) => (
-                      <View
-                        key={geofence.id}
-                        className={`bg-gray-50 p-3 rounded-lg border border-gray-100 relative 
-              ${idx !== arr.length - 1 ? "mb-3" : ""}`}
-                      >
-                        <View style={{ paddingRight: 30 }}>
-                          <Text className="font-medium text-gray-900">{geofence.name}</Text>
-                          <Text className="text-sm text-gray-600">{geofence.address}</Text>
+              <View className="bg-green-100 px-2 py-1 rounded-full">
+                <Text className="text-xs font-bold text-green-700">{userData.geofences?.length || 0}개</Text>
+              </View>
+            </View>
 
-                          {geofence.type === 1 && geofence.startTime && geofence.endTime && (
-                            <Text className="text-xs text-gray-500 mt-1">
-                              시간: {formatDateTime(geofence.startTime)} - {formatDateTime(geofence.endTime)}
-                            </Text>
-                          )}
+            {userData.geofences && userData.geofences.length > 0 ? (
+              <>
+                <View>
+                  {(isGeofenceListExpanded
+                    ? userData.geofences
+                    : userData.geofences.slice(0, 2)
+                  ).map((geofence) => (
+                    <View
+                      key={geofence.id}
+                      className="bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-2"
+                    >
+                      <View className="flex-row justify-between items-start mb-2">
+                        <View className="flex-1 mr-2">
+                          <Text className="font-bold text-gray-900 text-base mb-1">{geofence.name}</Text>
+                          <Text className="text-xs text-gray-500">{geofence.address}</Text>
                         </View>
-
-                        {/* 영역 유형 표시 */}
                         <View
-                          className={`self-start mt-2 px-2 py-1 rounded-full ${geofence.type === 0 ? "bg-green-100" : "bg-yellow-100"
-                            }`}
+                          className={`px-2 py-1 rounded-full ${geofence.type === 0 ? "bg-green-100" : "bg-orange-100"}`}
                         >
-                          <Text
-                            className={`text-xs font-semibold ${geofence.type === 0 ? "text-green-700" : "text-yellow-700"
-                              }`}
-                          >
-                            {geofence.type === 0 ? "영구 영역" : "일시적 영역"}
+                          <Text className={`text-[10px] font-bold ${geofence.type === 0 ? "text-green-700" : "text-orange-700"}`}>
+                            {geofence.type === 0 ? "영구" : "일시"}
                           </Text>
                         </View>
-
-                        {/* 삭제 버튼 */}
-                        <TouchableOpacity
-                          onPress={() => handleGeofenceDelete(geofence.id, geofence.name)}
-                          className="absolute right-2 p-2"
-                          style={{
-                            top: '50%',
-                            transform: [{ translateY: -5 }], // 아이콘의 절반 정도 위로
-                          }}
-                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        >
-                          <Trash2 size={18} color="#ffa7a7ff" />
-                        </TouchableOpacity>
-
                       </View>
-                    ))}
-                  </View>
 
-                  {userData.geofences.length > 2 && (
-                    <TouchableOpacity
-                      onPress={() => setIsGeofenceListExpanded(!isGeofenceListExpanded)}
-                      className="flex-row items-center justify-center pt-4 mt-2 border-t border-gray-100"
-                    >
-                      <Text className="text-sm font-medium text-blue-600">
-                        {isGeofenceListExpanded ? "리스트 접기" : "리스트 펼치기"}
-                      </Text>
-
-                      {isGeofenceListExpanded ? (
-                        <ChevronUp size={18} color="#2563EB" className="ml-1" />
-                      ) : (
-                        <ChevronDown size={18} color="#2563EB" className="ml-1" />
+                      {geofence.type === 1 && geofence.startTime && geofence.endTime && (
+                        <View className="bg-white p-2 rounded-lg mt-2">
+                          <Text className="text-xs text-gray-500">
+                            🕒 {formatDateTime(geofence.startTime)} ~ {formatDateTime(geofence.endTime)}
+                          </Text>
+                        </View>
                       )}
-                    </TouchableOpacity>
-                  )}
-                </>
-              ) : (
-                <Text className="text-gray-500 text-center py-4">등록된 지오펜싱 영역이 없습니다.</Text>
-              )}
-            </CardContent>
-          </Card>
 
+                      <TouchableOpacity
+                        onPress={() => handleGeofenceDelete(geofence.id, geofence.name)}
+                        className="absolute bottom-4 right-4 bg-white p-1.5 rounded-full shadow-sm border border-gray-100"
+                      >
+                        <Trash2 size={14} color="#ef4444" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
 
+                {userData.geofences.length > 2 && (
+                  <TouchableOpacity
+                    onPress={() => setIsGeofenceListExpanded(!isGeofenceListExpanded)}
+                    className="flex-row items-center justify-center py-3 mt-2"
+                  >
+                    <Text className="text-sm font-medium text-green-600 mr-1">
+                      {isGeofenceListExpanded ? "접기" : "더보기"}
+                    </Text>
+                    {isGeofenceListExpanded ? (
+                      <ChevronUp size={16} color="#16a34a" />
+                    ) : (
+                      <ChevronDown size={16} color="#16a34a" />
+                    )}
+                  </TouchableOpacity>
+                )}
+              </>
+            ) : (
+              <View className="py-8 items-center justify-center bg-gray-50 rounded-2xl border-dashed border-2 border-gray-200">
+                <Text className="text-gray-400 text-sm">등록된 영역이 없습니다</Text>
+              </View>
+            )}
+          </View>
 
           {/* 계정 설정 */}
-          <Card className="mb-4">
-            <CardHeader>
-              <View className="flex-row items-center">
-                <Settings size={20} color="#6B7280" />
-                <Text className="ml-2 text-lg font-semibold text-gray-900">계정 설정</Text>
+          <View className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 mb-6">
+            <View className="flex-row items-center mb-4">
+              <View className="w-8 h-8 rounded-full bg-green-50 items-center justify-center mr-2">
+                <Settings size={16} color="#16a34a" />
               </View>
-            </CardHeader>
-            <CardContent>
-              <View className="space-y-3">
-                <TouchableOpacity
-                  onPress={() => Alert.alert('알림', '추후 추가될 예정입니다.')}
-                  className="flex-row items-center justify-between py-2"
-                >
-                  <View className="flex-row items-center">
-                    <Shield size={18} color="#4B5563" />
-                    <Text className="ml-3 font-medium text-gray-800">비밀번호 변경</Text>
-                  </View>
-                  <ChevronRight size={18} color="#9CA3AF" />
-                </TouchableOpacity>
+              <Text className="text-lg font-bold text-gray-900">설정</Text>
+            </View>
 
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('PrivacyPolicyPage' as never)}
-                  className="flex-row items-center justify-between py-2"
-                >
-                  <View className="flex-row items-center">
-                    <User size={18} color="#4B5563" />
-                    <Text className="ml-3 font-medium text-gray-800">개인정보 처리방침</Text>
-                  </View>
-                  <ChevronRight size={18} color="#9CA3AF" />
-                </TouchableOpacity>
+            <View className="space-y-1">
+              <TouchableOpacity
+                onPress={() => Alert.alert('알림', '추후 추가될 예정입니다.')}
+                className="flex-row items-center justify-between py-3 px-2 active:bg-gray-50 rounded-xl"
+              >
+                <View className="flex-row items-center">
+                  <View className="w-8 items-center"><Shield size={18} color="#4b5563" /></View>
+                  <Text className="font-medium text-gray-700">비밀번호 변경</Text>
+                </View>
+                <ChevronRight size={16} color="#9ca3af" />
+              </TouchableOpacity>
 
-                <View className="h-px bg-gray-200 my-2" />
+              <TouchableOpacity
+                onPress={() => navigation.navigate('PrivacyPolicyPage' as never)}
+                className="flex-row items-center justify-between py-3 px-2 active:bg-gray-50 rounded-xl"
+              >
+                <View className="flex-row items-center">
+                  <View className="w-8 items-center"><User size={18} color="#4b5563" /></View>
+                  <Text className="font-medium text-gray-700">개인정보 처리방침</Text>
+                </View>
+                <ChevronRight size={16} color="#9ca3af" />
+              </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={handleLogout}
-                  className="flex-row items-center py-2"
-                >
-                  <LogOut size={18} color="#DC2626" />
-                  <Text className="ml-3 font-medium text-red-600">로그아웃</Text>
-                </TouchableOpacity>
-              </View>
-            </CardContent>
-          </Card>
+              <View className="h-px bg-gray-100 my-2" />
 
-          {/* 앱 정보 */}
-          <Card>
-            <CardContent>
-              <View className="items-center py-2">
-                <Text className="text-sm text-gray-500">SafetyFence v1.0.0</Text>
-              </View>
-            </CardContent>
-          </Card>
+              <TouchableOpacity
+                onPress={handleLogout}
+                className="flex-row items-center py-3 px-2 active:bg-red-50 rounded-xl"
+              >
+                <View className="w-8 items-center"><LogOut size={18} color="#ef4444" /></View>
+                <Text className="font-medium text-red-500">로그아웃</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View className="items-center pb-8">
+            <Text className="text-xs text-gray-300">SafetyFence v1.0.0</Text>
+          </View>
         </View>
       </ScrollView>
 
@@ -472,64 +465,66 @@ const MyPage: React.FC = () => {
       <Modal
         visible={isPasswordModalOpen}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setIsPasswordModalOpen(false)}
       >
-        <View className="flex-1 bg-black/50 justify-center p-4">
-          <View className="bg-white rounded-lg p-6">
-            <Text className="text-lg font-semibold mb-4">비밀번호 변경</Text>
+        <View className="flex-1 bg-black/50 justify-center p-6">
+          <View className="bg-white rounded-3xl p-6">
+            <Text className="text-xl font-bold mb-6 text-center">비밀번호 변경</Text>
 
             <View className="space-y-4">
               <View>
-                <Text className="text-sm font-medium text-gray-700 mb-1">현재 비밀번호</Text>
+                <Text className="text-sm font-bold text-gray-600 mb-2 ml-1">현재 비밀번호</Text>
                 <TextInput
                   value={passwordData.currentPassword}
                   onChangeText={(text) => setPasswordData({ ...passwordData, currentPassword: text })}
                   secureTextEntry
-                  className="border border-gray-300 rounded-md px-3 py-2"
+                  className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5"
+                  placeholder="현재 비밀번호를 입력하세요"
                 />
               </View>
 
               <View>
-                <Text className="text-sm font-medium text-gray-700 mb-1">새 비밀번호</Text>
+                <Text className="text-sm font-bold text-gray-600 mb-2 ml-1">새 비밀번호</Text>
                 <TextInput
                   value={passwordData.newPassword}
                   onChangeText={(text) => setPasswordData({ ...passwordData, newPassword: text })}
                   secureTextEntry
-                  className="border border-gray-300 rounded-md px-3 py-2"
+                  className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5"
+                  placeholder="새 비밀번호를 입력하세요"
                 />
               </View>
 
               <View>
-                <Text className="text-sm font-medium text-gray-700 mb-1">새 비밀번호 확인</Text>
+                <Text className="text-sm font-bold text-gray-600 mb-2 ml-1">새 비밀번호 확인</Text>
                 <TextInput
                   value={passwordData.confirmPassword}
                   onChangeText={(text) => setPasswordData({ ...passwordData, confirmPassword: text })}
                   secureTextEntry
-                  className="border border-gray-300 rounded-md px-3 py-2"
+                  className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5"
+                  placeholder="새 비밀번호를 다시 입력하세요"
                 />
               </View>
 
-              <View className="flex-row space-x-2 mt-6">
-                <Button
+              <View className="flex-row space-x-3 mt-4">
+                <TouchableOpacity
                   onPress={() => setIsPasswordModalOpen(false)}
-                  variant="outline"
-                  className="flex-1"
+                  className="flex-1 bg-gray-100 py-4 rounded-2xl items-center"
                 >
-                  <Text className="text-gray-700">취소</Text>
-                </Button>
-                <Button
+                  <Text className="text-gray-600 font-bold">취소</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   onPress={handlePasswordChange}
-                  className="flex-1"
+                  className="flex-1 bg-green-500 py-4 rounded-2xl items-center"
                 >
-                  <Text className="text-white">변경</Text>
-                </Button>
+                  <Text className="text-white font-bold">변경하기</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </SafeAreaView >
   );
 };
 //

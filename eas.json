@@ -6,8 +6,7 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "android": {}
+      "distribution": "internal"
     },
     "preview": {
       "distribution": "internal",
@@ -19,8 +18,7 @@
       }
     },
     "production": {
-      "autoIncrement": true,
-      "android": {}
+      "autoIncrement": true
     }
   },
   "submit": {

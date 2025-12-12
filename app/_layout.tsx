@@ -1,10 +1,10 @@
 import { Stack } from "expo-router";
 import { useEffect } from "react";
-import { storage } from "../utils/storage";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import Global from "../constants/Global";
 import { LocationProvider } from "../contexts/LocationContext";
 import "../global.css";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { storage } from "../utils/storage";
 
 /**
  * 앱 초기화 컴포넌트
@@ -61,6 +61,7 @@ export default function RootLayout() {
           <Stack.Screen name="MyPage" options={{ headerShown: false }} />
           <Stack.Screen name="LinkPage" options={{ headerShown: false }} />
           <Stack.Screen name="LogPage" options={{ headerShown: false }} />
+          <Stack.Screen name="GalleryPage" options={{ headerShown: false }} />
           <Stack.Screen name="Signup" options={{ headerShown: false }} />
         </Stack>
       </LocationProvider>
