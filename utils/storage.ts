@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
   FCM_TOKEN: '@safetyFence:fcmToken',
   GEOFENCE_ENTRY_STATE: '@safetyFence:geofenceEntryState',
   GEOFENCE_CACHE: '@safetyFence:geofenceCache',
+  AUTO_LOGIN: '@safetyFence:autoLogin',
 } as const;
 
 interface GeofenceCache {
@@ -134,6 +135,27 @@ export const storage = {
     } catch (error) {
       console.error('로그인 정보 저장 실패:', error);
       throw error;
+    }
+  },
+
+  // 자동 로그인 설정 저장
+  async setAutoLogin(autoLogin: boolean): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.AUTO_LOGIN, JSON.stringify(autoLogin));
+    } catch (error) {
+      console.error('자동 로그인 설정 저장 실패:', error);
+      throw error;
+    }
+  },
+
+  // 자동 로그인 설정 가져오기
+  async getAutoLogin(): Promise<boolean> {
+    try {
+      const value = await AsyncStorage.getItem(STORAGE_KEYS.AUTO_LOGIN);
+      return value ? JSON.parse(value) : true; // 기본값 true
+    } catch (error) {
+      console.error('자동 로그인 설정 가져오기 실패:', error);
+      return true; // 에러 시 기본값 true
     }
   },
 

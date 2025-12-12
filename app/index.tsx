@@ -1,6 +1,7 @@
 import Global from '@/constants/Global';
 import { useLocation } from '@/contexts/LocationContext';
 import { useRouter } from 'expo-router';
+import { CheckSquare, Square } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -28,6 +29,48 @@ const LoginPage: React.FC = () => {
   const [number, setNumber] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [autoLogin, setAutoLogin] = useState(true); // 기본값 true
+  const [isCheckingAutoLogin, setIsCheckingAutoLogin] = useState(true);
+
+  // 앱 시작 시 자동 로그인 확인
+  React.useEffect(() => {
+    const checkAutoLogin = async () => {
+      try {
+        const [savedAutoLogin, apiKey, userRole] = await Promise.all([
+          storage.getAutoLogin(),
+          storage.getApiKey(),
+          storage.getUserRole(),
+        ]);
+
+        setAutoLogin(savedAutoLogin);
+
+        // 자동 로그인이 활성화되어 있고 로그인 정보가 있으면 자동 로그인
+        if (savedAutoLogin && apiKey) {
+          console.log('✅ 자동 로그인 시작');
+
+          if (userRole === 'user') {
+            await startTracking();
+            await disconnectWebSocket();
+            connectWebSocket();
+            router.replace('/MapPage');
+          } else if (userRole === 'supporter') {
+            await disconnectWebSocket();
+            router.replace('/LinkPage');
+          } else {
+            // 역할이 없으면 역할 선택 화면으로
+            router.replace('/SelectRole');
+          }
+        } else {
+          setIsCheckingAutoLogin(false);
+        }
+      } catch (error) {
+        console.error('자동 로그인 확인 실패:', error);
+        setIsCheckingAutoLogin(false);
+      }
+    };
+
+    checkAutoLogin();
+  }, []);
 
   const handleLogin = async () => {
     // 입력 검증
@@ -52,6 +95,9 @@ const LoginPage: React.FC = () => {
       // AsyncStorage에 로그인 정보 저장
       await storage.setLoginInfo(response.apiKey, response.number, response.name);
 
+      // 자동 로그인 설정 저장
+      await storage.setAutoLogin(autoLogin);
+
       // 로그인 성공 후 알림 토큰 발급 및 서버 등록
       await initializeNotifications();
 
@@ -70,6 +116,17 @@ const LoginPage: React.FC = () => {
   const handleSignup = () => {
     router.push('/Signup');
   };
+
+  // 자동 로그인 체크 중 로딩 화면
+  if (isCheckingAutoLogin) {
+    return (
+      <SafeAreaView className="flex-1 bg-white justify-center items-center">
+        <StatusBar barStyle="dark-content" backgroundColor="white" />
+        <ActivityIndicator size="large" color="#22c55e" />
+        <Text className="text-gray-600 mt-4 text-base">로그인 확인 중...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -118,13 +175,27 @@ const LoginPage: React.FC = () => {
 
                 <Text className="text-gray-600 font-semibold mb-2 ml-1">비밀번호</Text>
                 <TextInput
-                  className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 text-gray-900 text-base mb-8"
+                  className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 text-gray-900 text-base mb-4"
                   placeholder="비밀번호를 입력하세요"
                   placeholderTextColor="#9ca3af"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
                 />
+
+                {/* 자동 로그인 체크박스 */}
+                <TouchableOpacity
+                  className="flex-row items-center mb-6 ml-1"
+                  onPress={() => setAutoLogin(!autoLogin)}
+                  activeOpacity={0.7}
+                >
+                  {autoLogin ? (
+                    <CheckSquare size={20} color="#22c55e" />
+                  ) : (
+                    <Square size={20} color="#9ca3af" />
+                  )}
+                  <Text className="text-gray-700 text-base ml-2">자동 로그인</Text>
+                </TouchableOpacity>
 
                 <TouchableOpacity
                   className={`w-full py-4 rounded-2xl items-center justify-center shadow-lg shadow-green-200 ${isLoading ? 'bg-green-400' : 'bg-green-500 active:bg-green-600'

@@ -67,12 +67,25 @@ const HTML_CONTENT = `
       justify-content: center;
     }
     .target-marker {
-      width: 24px;
-      height: 24px;
+      width: 40px;
+      height: 40px;
       background-color: #ef4444;
-      border: 3px solid white;
-      border-radius: 50%;
-      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+      /* border: 3px solid white; Removed border to match my-marker style */
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .target-marker .icon {
+      transform: rotate(45deg); /* Counter-rotate to make icon upright */
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .customoverlay { 
       position: relative; 
@@ -244,7 +257,11 @@ const HTML_CONTENT = `
         const targetPosition = new kakao.maps.LatLng(targetLocation.latitude, targetLocation.longitude);
         
         if (!targetLocationMarker) {
-          const content = '<div class="target-marker"></div>';
+          const content = '<div class="target-marker">' + 
+            '<div class="icon">' +
+            '<svg width="20" height="20" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>' +
+            '</div>' +
+            '</div>';
           targetLocationMarker = new kakao.maps.CustomOverlay({
             position: targetPosition,
             content: content,

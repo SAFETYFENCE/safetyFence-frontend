@@ -1,9 +1,9 @@
-import { ChevronDown, ChevronUp, Clock, MapPin, Calendar } from 'lucide-react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Calendar, ChevronDown, ChevronUp, Clock, MapPin } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   Alert,
   Modal,
-  Platform,
   SafeAreaView,
   ScrollView,
   Text,
@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import DaumPostcode, { DaumPostcodeData } from '../utils/DaumPostcode';
 
 interface GeofenceData {
@@ -80,12 +79,8 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
       return;
     }
 
-    if (formData.type === 'temporary' && (!formData.startTime || !formData.endTime)) {
-      Alert.alert('입력 오류', '일시적 영역의 경우 시작 시간과 종료 시간을 모두 설정해주세요.');
-      return;
-    }
 
-    const fullAddress = detailAddress 
+    const fullAddress = detailAddress
       ? `${formData.address} ${detailAddress}`
       : formData.address;
 
@@ -205,15 +200,15 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
     }
   };
 
-  const TimePickerUI = ({ 
-    type, 
-    hours, 
-    minutes, 
-    onClose 
-  }: { 
-    type: 'start' | 'end'; 
-    hours: string; 
-    minutes: string; 
+  const TimePickerUI = ({
+    type,
+    hours,
+    minutes,
+    onClose
+  }: {
+    type: 'start' | 'end';
+    hours: string;
+    minutes: string;
     onClose: () => void;
   }) => (
     <View className="border border-gray-300 rounded-lg p-4">
@@ -307,7 +302,7 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
                     {formData.address || "주소 검색하기"}
                   </Text>
                 </TouchableOpacity>
-                
+
                 {formData.address && (
                   <TextInput
                     className="border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
@@ -324,31 +319,27 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
                 <Text className="text-sm font-medium text-gray-700 mb-3">특성</Text>
                 <View className="flex-row space-x-4">
                   <TouchableOpacity
-                    className={`flex-1 py-3 px-4 rounded-lg ${
-                      formData.type === 'permanent'
+                    className={`flex-1 py-3 px-4 rounded-lg ${formData.type === 'permanent'
                         ? 'bg-green-500'
                         : 'bg-gray-200'
-                    }`}
+                      }`}
                     onPress={() => setFormData(prev => ({ ...prev, type: 'permanent' }))}
                   >
-                    <Text className={`text-center font-medium ${
-                      formData.type === 'permanent' ? 'text-white' : 'text-gray-600'
-                    }`}>
+                    <Text className={`text-center font-medium ${formData.type === 'permanent' ? 'text-white' : 'text-gray-600'
+                      }`}>
                       영구
                     </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    className={`flex-1 py-3 px-4 rounded-lg ${
-                      formData.type === 'temporary'
+                    className={`flex-1 py-3 px-4 rounded-lg ${formData.type === 'temporary'
                         ? 'bg-green-600'
                         : 'bg-gray-200'
-                    }`}
+                      }`}
                     onPress={() => setFormData(prev => ({ ...prev, type: 'temporary' }))}
                   >
-                    <Text className={`text-center font-medium ${
-                      formData.type === 'temporary' ? 'text-white' : 'text-gray-600'
-                    }`}>
+                    <Text className={`text-center font-medium ${formData.type === 'temporary' ? 'text-white' : 'text-gray-600'
+                      }`}>
                       일시적
                     </Text>
                   </TouchableOpacity>
@@ -358,7 +349,7 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
               {/* 시간 설정 (일시적 영역일 때만) */}
               {formData.type === 'temporary' && (
                 <View className="mb-6">
-                  <Text className="text-sm font-medium text-gray-700 mb-3">시간 및 날짜 추가 (필수)</Text>
+                  <Text className="text-sm font-medium text-gray-700 mb-3">시간 및 날짜 추가</Text>
 
                   {/* 시작 날짜 */}
                   <View className="mb-4">
@@ -392,7 +383,7 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
                       onChange={onDateChange}
                     />
                   )}
-                  
+
                   {/* 시작 시간 */}
                   <View className="mb-4">
                     <Text className="text-sm text-gray-600 mb-2">시작 시간</Text>
@@ -405,7 +396,7 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
                         <Text className="ml-3 text-gray-900">{startHours}:{startMinutes}</Text>
                       </TouchableOpacity>
                     ) : (
-                      <TimePickerUI 
+                      <TimePickerUI
                         type="start"
                         hours={startHours}
                         minutes={startMinutes}
@@ -426,7 +417,7 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
                         <Text className="ml-3 text-gray-900">{endHours}:{endMinutes}</Text>
                       </TouchableOpacity>
                     ) : (
-                      <TimePickerUI 
+                      <TimePickerUI
                         type="end"
                         hours={endHours}
                         minutes={endMinutes}
@@ -458,14 +449,14 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
         <SafeAreaView style={{ flex: 1 }}>
           <View className="flex-row items-center justify-between p-4 border-b border-gray-200">
             <Text className="text-lg font-bold">주소 검색</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setIsAddressModalVisible(false)}
               className="p-2"
             >
               <Text className="text-xl text-gray-500">✕</Text>
             </TouchableOpacity>
           </View>
-          
+
           <DaumPostcode
             onSubmit={handleAddressSelect}
             onClose={() => setIsAddressModalVisible(false)}

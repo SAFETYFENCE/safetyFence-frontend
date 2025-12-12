@@ -10,6 +10,7 @@ import {
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
+  BackHandler,
   Modal,
   SafeAreaView,
   ScrollView,
@@ -124,6 +125,17 @@ const UsersScreen: React.FC = () => {
     useCallback(() => {
       syncSelectedUserState(users);
     }, [syncSelectedUserState, users])
+  );
+
+  // 안드로이드 뒤로가기 버튼 비활성화
+  useFocusEffect(
+    useCallback(() => {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        return true; // true 반환으로 기본 뒤로가기 동작 차단
+      });
+
+      return () => backHandler.remove();
+    }, [])
   );
 
   const handleUserClick = (userNumber: string) => {
