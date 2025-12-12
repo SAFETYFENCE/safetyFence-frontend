@@ -31,9 +31,17 @@ apiClient.interceptors.request.use(
         // AsyncStorage에서 apiKey 가져오기
         const apiKey = await storage.getApiKey();
 
+        console.log('🔑 API 요청 인터셉터:', {
+          url: config.url,
+          hasApiKey: !!apiKey,
+          apiKeyPreview: apiKey ? apiKey.substring(0, 10) + '...' : 'null'
+        });
+
         // apiKey가 있으면 헤더에 추가 (백엔드는 X-API-Key 헤더를 기대함)
         if (apiKey && config.headers) {
           config.headers['X-API-Key'] = apiKey;
+        } else if (!apiKey) {
+          console.warn('⚠️ apiKey가 없습니다! 요청이 실패할 수 있습니다.');
         }
       }
 

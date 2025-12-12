@@ -1,8 +1,9 @@
 import Global from '@/constants/Global';
+import { emergencyService } from '@/services/emergencyService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { Calendar, Image as ImageIcon, MapPin, Siren, User, Users } from 'lucide-react-native';
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,6 +16,7 @@ type BottomTabScreenName = 'MapPage' | 'CalendarPage' | 'MyPage' | 'LinkPage' | 
 const BottomNavigation: React.FC<BottomNavigationProps> = ({ currentScreen }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const [isSendingEmergency, setIsSendingEmergency] = useState(false);
 
   const activeColor = '#20e066ff'; // 활성 (녹색)
   const inactiveColor = '#9ba5baff'; // 비활성 (회색)
@@ -49,13 +51,37 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ currentScreen }) =>
     return currentScreen === screenName ? 'font-bold' : 'font-normal';
   };
 
+  const sendEmergencyAlert = useCallback(async () => {
+    if (isSendingEmergency) return;
+
+    try {
+      setIsSendingEmergency(true);
+
+      if (!Global.NUMBER) {
+        Alert.alert('로그인 필요', '로그인 후 긴급 알림을 사용할 수 있습니다.');
+        return;
+      }
+
+      await emergencyService.sendAlert();
+
+      Alert.alert('전송 완료', '긴급 알림을 전송했습니다.');
+    } catch (error) {
+      console.error('❌ 긴급 알림 전송 실패:', error);
+      Alert.alert('전송 실패', '네트워크 상태를 확인한 뒤 다시 시도해주세요.');
+    } finally {
+      setIsSendingEmergency(false);
+    }
+  }, [isSendingEmergency]);
+
   const handleEmergency = () => {
+    if (isSendingEmergency) return;
+
     Alert.alert(
       '긴급 알림',
       '긴급 알림을 전송하시겠습니까?',
       [
         { text: '취소', style: 'cancel' },
-        { text: '전송', style: 'destructive', onPress: () => console.log('긴급 알림 전송') }
+        { text: '전송', style: 'destructive', onPress: () => sendEmergencyAlert() }
       ]
     );
   };

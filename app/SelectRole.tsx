@@ -62,8 +62,8 @@ export default function SelectRolePage() {
           </Text>
         </View>
 
-        <View className="px-6 flex-1">
-          {/* 역할 선택 카드들 */}
+        {/* 역할 선택 카드들 - 화면 중앙 정렬 */}
+        <View className="px-6 py-5 flex-1">
           <View className="space-y-4">
             {/* 이용자 카드 */}
             <TouchableOpacity
@@ -127,26 +127,26 @@ export default function SelectRolePage() {
               </View>
             </TouchableOpacity>
           </View>
+        </View>
 
-          {/* 계속하기 버튼 */}
-          <View className="mt-auto mb-8">
-            <TouchableOpacity
-              onPress={handleContinue}
-              disabled={!selectedRole}
-              className={`w-full py-4 rounded-2xl items-center justify-center shadow-lg ${selectedRole
-                ? 'bg-green-600 shadow-green-200 active:bg-green-700'
-                : 'bg-gray-200'
+        {/* 계속하기 버튼 - 위로 2cm 올림 */}
+        <View className="px-6 pb-20">
+          <TouchableOpacity
+            onPress={handleContinue}
+            disabled={!selectedRole}
+            className={`w-full py-4 rounded-2xl items-center justify-center shadow-lg ${selectedRole
+              ? 'bg-green-600 shadow-green-200 active:bg-green-700'
+              : 'bg-gray-200'
+              }`}
+            activeOpacity={selectedRole ? 0.8 : 1}
+          >
+            <Text
+              className={`text-lg font-bold ${selectedRole ? 'text-white' : 'text-gray-400'
                 }`}
-              activeOpacity={selectedRole ? 0.8 : 1}
             >
-              <Text
-                className={`text-lg font-bold ${selectedRole ? 'text-white' : 'text-gray-400'
-                  }`}
-              >
-                {selectedRole === 'user' ? '이용자로 시작하기' : selectedRole === 'supporter' ? '보호자로 시작하기' : '역할을 선택해주세요'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+              {selectedRole === 'user' ? '이용자로 시작하기' : selectedRole === 'supporter' ? '보호자로 시작하기' : '역할을 선택해주세요'}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>

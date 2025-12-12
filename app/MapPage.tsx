@@ -1,14 +1,14 @@
 import Global from '@/constants/Global';
 import { useFocusEffect } from '@react-navigation/native';
-import { useLocation } from '../contexts/LocationContext';
-import { geofenceService } from '../services/geofenceService';
 import { MapPin, Plus } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Linking, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, BackHandler, Linking, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BottomNavigation from '../components/BottomNavigation';
 import GeofenceModal from '../components/GeofenceModal';
 import KakaoMap, { KakaoMapHandle } from '../components/KakaoMap';
+import { useLocation } from '../contexts/LocationContext';
+import { geofenceService } from '../services/geofenceService';
 
 interface RealTimeLocation {
   latitude: number;
@@ -78,6 +78,29 @@ const MainPage: React.FC = () => {
         loadGeofences();
       }
     }, [userRole, loadGeofences])
+  );
+
+  // 주기적 지오펜스 동기화 (30초마다)
+  useEffect(() => {
+    if (!userRole) return;
+
+    const syncInterval = setInterval(() => {
+      console.log('🔄 지오펜스 목록 자동 동기화');
+      loadGeofences();
+    }, 30000); // 30초
+
+    return () => clearInterval(syncInterval);
+  }, [userRole, loadGeofences]);
+
+  // 안드로이드 뒤로가기 버튼 막기 (백그라운드 작동 앱이므로)
+  useFocusEffect(
+    useCallback(() => {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        return true; // true 반환으로 기본 뒤로가기 동작 차단
+      });
+
+      return () => backHandler.remove();
+    }, [])
   );
 
   const moveToMyLocation = () => {
@@ -371,7 +394,7 @@ const styles = StyleSheet.create({
   fabContainer: {
     position: 'absolute',
     right: 20,
-    bottom: Platform.OS === 'ios' ? 110 : 90,
+    bottom: Platform.OS === 'ios' ? 110 : 130,
     alignItems: 'center',
     zIndex: 50,
   },

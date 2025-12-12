@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { GeofenceItem } from '../types/api';
 
 /**
  * AsyncStorage 래퍼 유틸리티
@@ -12,7 +13,14 @@ const STORAGE_KEYS = {
   USER_ROLE: '@safetyFence:userRole',
   TARGET_NUMBER: '@safetyFence:targetNumber',
   FCM_TOKEN: '@safetyFence:fcmToken',
+  GEOFENCE_ENTRY_STATE: '@safetyFence:geofenceEntryState',
+  GEOFENCE_CACHE: '@safetyFence:geofenceCache',
 } as const;
+
+interface GeofenceCache {
+  data: GeofenceItem[];
+  timestamp: number;
+}
 
 export const storage = {
   // API 키 저장
@@ -174,6 +182,77 @@ export const storage = {
     } catch (error) {
       console.error(`${key} 가져오기 실패:`, error);
       return null;
+    }
+  },
+
+  // ==================== Geofence 관련 ====================
+
+  // 지오펜스 진입 상태 가져오기
+  async getGeofenceEntryState(): Promise<{ [key: number]: boolean }> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.GEOFENCE_ENTRY_STATE);
+      return data ? JSON.parse(data) : {};
+    } catch (error) {
+      console.error('지오펜스 진입 상태 가져오기 실패:', error);
+      return {};
+    }
+  },
+
+  // 지오펜스 진입 상태 저장
+  async setGeofenceEntryState(state: { [key: number]: boolean }): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.GEOFENCE_ENTRY_STATE, JSON.stringify(state));
+    } catch (error) {
+      console.error('지오펜스 진입 상태 저장 실패:', error);
+      throw error;
+    }
+  },
+
+  // 지오펜스 캐시 가져오기 (TTL: 5분)
+  async getGeofenceCache(): Promise<GeofenceCache | null> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.GEOFENCE_CACHE);
+      if (!data) return null;
+
+      const cache: GeofenceCache = JSON.parse(data);
+      const now = Date.now();
+      const CACHE_TTL = 5 * 60 * 1000; // 5분
+
+      // 캐시 만료 체크
+      if (now - cache.timestamp > CACHE_TTL) {
+        console.log('ℹ️ 지오펜스 캐시 만료');
+        await this.clearGeofenceCache();
+        return null;
+      }
+
+      return cache;
+    } catch (error) {
+      console.error('지오펜스 캐시 가져오기 실패:', error);
+      return null;
+    }
+  },
+
+  // 지오펜스 캐시 저장
+  async setGeofenceCache(data: GeofenceItem[]): Promise<void> {
+    try {
+      const cache: GeofenceCache = {
+        data,
+        timestamp: Date.now(),
+      };
+      await AsyncStorage.setItem(STORAGE_KEYS.GEOFENCE_CACHE, JSON.stringify(cache));
+    } catch (error) {
+      console.error('지오펜스 캐시 저장 실패:', error);
+      throw error;
+    }
+  },
+
+  // 지오펜스 캐시 삭제
+  async clearGeofenceCache(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEYS.GEOFENCE_CACHE);
+    } catch (error) {
+      console.error('지오펜스 캐시 삭제 실패:', error);
+      throw error;
     }
   },
 };

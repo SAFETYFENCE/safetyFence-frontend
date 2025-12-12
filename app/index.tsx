@@ -19,6 +19,7 @@ import {
   View
 } from 'react-native';
 import { authService } from '../services/authService';
+import { initializeNotifications } from '../services/notificationService';
 import { storage } from '../utils/storage';
 
 const LoginPage: React.FC = () => {
@@ -50,6 +51,9 @@ const LoginPage: React.FC = () => {
 
       // AsyncStorage에 로그인 정보 저장
       await storage.setLoginInfo(response.apiKey, response.number, response.name);
+
+      // 로그인 성공 후 알림 토큰 발급 및 서버 등록
+      await initializeNotifications();
 
       // 기존 연결이 있다면 정리하고 역할 선택 화면으로 이동
       await disconnectWebSocket();
@@ -123,7 +127,7 @@ const LoginPage: React.FC = () => {
                 />
 
                 <TouchableOpacity
-                  className={`w-full py-4 rounded-2xl items-center justify-center shadow-lg shadow-green-200 ${isLoading ? 'bg-green-400' : 'bg-green-600 active:bg-green-700'
+                  className={`w-full py-4 rounded-2xl items-center justify-center shadow-lg shadow-green-200 ${isLoading ? 'bg-green-400' : 'bg-green-500 active:bg-green-600'
                     }`}
                   onPress={handleLogin}
                   disabled={isLoading}
@@ -150,7 +154,7 @@ const LoginPage: React.FC = () => {
                   계정이 없으신가요?
                 </Text>
                 <TouchableOpacity onPress={handleSignup} className="ml-2 py-2">
-                  <Text className="text-green-600 font-bold text-base">
+                  <Text className="text-green-500 font-bold text-base">
                     회원가입
                   </Text>
                 </TouchableOpacity>

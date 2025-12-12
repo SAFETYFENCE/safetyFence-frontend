@@ -68,6 +68,7 @@ export const registerForPushNotifications = async (): Promise<string | null> => 
 
     // Android 알림 채널 설정
     if (Platform.OS === 'android') {
+      // 지오펜스 알림 채널
       await Notifications.setNotificationChannelAsync('geofence_notifications', {
         name: '지오펜스 알림',
         importance: Notifications.AndroidImportance.HIGH,
@@ -76,6 +77,18 @@ export const registerForPushNotifications = async (): Promise<string | null> => 
         sound: 'default',
         enableVibrate: true,
         showBadge: true,
+      });
+
+      // 긴급 알림 채널
+      await Notifications.setNotificationChannelAsync('emergency_notifications', {
+        name: '긴급 알림',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 500, 200, 500], // 더 강한 진동
+        lightColor: '#ef4444', // 빨간색
+        sound: 'default',
+        enableVibrate: true,
+        showBadge: true,
+        enableLights: true,
       });
     }
 
@@ -178,7 +191,14 @@ export const setupNotificationListeners = () => {
   const notificationListener = Notifications.addNotificationReceivedListener(notification => {
     console.log('🔔 알림 수신 (포그라운드):', notification);
     const { title, body } = notification.request.content;
-    console.log(`📬 제목: ${title}, 내용: ${body}`);
+    const { type } = notification.request.content.data || {};
+
+    console.log(`📬 제목: ${title}, 내용: ${body}, 타입: ${type}`);
+
+    // 긴급 알림은 포그라운드에서도 강조 표시
+    if (type === 'emergency') {
+      console.log('🚨 긴급 알림 수신!');
+    }
   });
 
   // 알림 클릭 시
@@ -186,9 +206,17 @@ export const setupNotificationListeners = () => {
     console.log('🔔 알림 클릭:', response);
     const { elderNumber, type } = response.notification.request.content.data || {};
 
-    if (type === 'geofence' && elderNumber) {
+    if (type === 'emergency' && elderNumber) {
+      console.log(`🚨 긴급 알림 클릭: 어르신 번호=${elderNumber}`);
+
+      // 긴급 알림 처리
+      handleEmergencyNotification(elderNumber);
+
+    } else if (type === 'geofence' && elderNumber) {
       console.log(`📍 지오펜스 알림 클릭: 어르신 번호=${elderNumber}`);
-      // TODO: 해당 어르신의 위치 화면으로 이동
+
+      // 지오펜스 알림 처리
+      handleGeofenceNotification(elderNumber);
     }
   });
 
@@ -196,6 +224,53 @@ export const setupNotificationListeners = () => {
     notificationListener,
     responseListener,
   };
+};
+
+/**
+ * 긴급 알림 클릭 처리
+ */
+const handleEmergencyNotification = async (elderNumber: string) => {
+  try {
+    // Global에 TARGET_NUMBER 설정 (보호자가 해당 이용자를 추적하도록)
+    const Global = require('@/constants/Global').default;
+    Global.TARGET_NUMBER = elderNumber;
+    await storage.setItem('targetNumber', elderNumber);
+
+    console.log(`🚨 긴급 상황! ${elderNumber}의 위치로 이동합니다.`);
+
+    // Alert로 긴급 상황 알림
+    const { Alert } = require('react-native');
+    Alert.alert(
+      '🚨 긴급 알림',
+      `${elderNumber}님이 긴급 버튼을 클릭하셨어요.\n확인 부탁드려요!`,
+      [{ text: '확인', style: 'default' }]
+    );
+
+    // TODO: MapPage로 자동 이동 (네비게이션 구현 필요)
+    // 현재는 사용자가 수동으로 지도 탭을 눌러야 합니다.
+
+  } catch (error) {
+    console.error('❌ 긴급 알림 처리 실패:', error);
+  }
+};
+
+/**
+ * 지오펜스 알림 클릭 처리
+ */
+const handleGeofenceNotification = async (elderNumber: string) => {
+  try {
+    // Global에 TARGET_NUMBER 설정
+    const Global = require('@/constants/Global').default;
+    Global.TARGET_NUMBER = elderNumber;
+    await storage.setItem('targetNumber', elderNumber);
+
+    console.log(`📍 ${elderNumber}의 지오펜스 알림 - 지도에서 확인 가능`);
+
+    // TODO: MapPage로 자동 이동 (필요 시 구현)
+
+  } catch (error) {
+    console.error('❌ 지오펜스 알림 처리 실패:', error);
+  }
 };
 
 /**
