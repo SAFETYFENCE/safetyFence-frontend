@@ -1,4 +1,5 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as Location from 'expo-location';
 import { Calendar, ChevronDown, ChevronUp, Clock, MapPin } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
@@ -175,13 +176,30 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
     }
   };
 
-  const handleAddressSelect = (data: DaumPostcodeData) => {
-    setFormData(prev => ({
-      ...prev,
-      address: data.address,
-    }));
-    setDetailAddress('');
-    setIsAddressModalVisible(false);
+  const handleAddressSelect = async (data: DaumPostcodeData) => {
+    try {
+      setFormData(prev => ({
+        ...prev,
+        address: data.address,
+      }));
+      setDetailAddress('');
+      setIsAddressModalVisible(false);
+
+      // 주소 -> 좌표 변환
+      const geocoded = await Location.geocodeAsync(data.address);
+      if (geocoded.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          latitude: geocoded[0].latitude,
+          longitude: geocoded[0].longitude,
+        }));
+      } else {
+        Alert.alert('알림', '해당 주소의 좌표를 찾을 수 없습니다.');
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      Alert.alert('오류', '주소를 좌표로 변환하는 데 실패했습니다.');
+    }
   };
 
   const openTimePicker = (type: 'start' | 'end') => {
@@ -324,8 +342,8 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
                 <View className="flex-row space-x-4">
                   <TouchableOpacity
                     className={`flex-1 py-3 px-4 rounded-lg ${formData.type === 'permanent'
-                        ? 'bg-green-500'
-                        : 'bg-gray-200'
+                      ? 'bg-green-500'
+                      : 'bg-gray-200'
                       }`}
                     onPress={() => setFormData(prev => ({ ...prev, type: 'permanent' }))}
                   >
@@ -337,8 +355,8 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
 
                   <TouchableOpacity
                     className={`flex-1 py-3 px-4 rounded-lg ${formData.type === 'temporary'
-                        ? 'bg-green-600'
-                        : 'bg-gray-200'
+                      ? 'bg-green-600'
+                      : 'bg-gray-200'
                       }`}
                     onPress={() => setFormData(prev => ({ ...prev, type: 'temporary' }))}
                   >

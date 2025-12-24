@@ -255,7 +255,7 @@ const UsersScreen: React.FC = () => {
             }, userNumber);
           } else if (activeBatchTab === 'location' && batchGeofenceData) {
             const formatTime = (date?: Date) => {
-              if (!date) return '';
+              if (!date) return null;
               return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
             };
 
@@ -263,8 +263,10 @@ const UsersScreen: React.FC = () => {
               name: batchGeofenceData.name,
               address: batchGeofenceData.address,
               type: batchGeofenceData.type === 'permanent' ? 0 : 1, // 0: 영구, 1: 일시
-              startTime: batchGeofenceData.type === 'temporary' ? formatTime(batchGeofenceData.startTime) : undefined,
-              endTime: batchGeofenceData.type === 'temporary' ? formatTime(batchGeofenceData.endTime) : undefined
+              startTime: formatTime(batchGeofenceData.startTime),
+              endTime: formatTime(batchGeofenceData.endTime),
+              latitude: batchGeofenceData.latitude,
+              longitude: batchGeofenceData.longitude,
             }, userNumber);
           }
           successCount++;

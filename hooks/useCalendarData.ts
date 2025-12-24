@@ -25,6 +25,7 @@ export const useCalendarData = (todayDateStr: string) => {
                 : undefined;
 
             const calendarData = await calendarService.getUserData(targetNumber);
+            console.log('UseCalendarData - Fetched Data:', JSON.stringify(calendarData, null, 2));
 
             const allSchedules: Schedule[] = [];
             const allTodos: Todo[] = [];
@@ -48,17 +49,27 @@ export const useCalendarData = (todayDateStr: string) => {
 
                     if (dayData.geofences) {
                         dayData.geofences.forEach((fence) => {
-                            const start = new Date(fence.startTime);
-                            const end = new Date(fence.endTime);
+                            let arriveTimeStr = '00:00';
 
-                            allSchedules.push({
+                            if (fence.type === 1 && fence.startTime) {
+                                // 일시적 지오펜스: 시작 시간 표시
+                                const start = new Date(fence.startTime);
+                                if (!isNaN(start.getTime())) {
+                                    arriveTimeStr = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`;
+                                }
+                            } else {
+                                // 영구 지오펜스: '상시' 또는 기본 시간 표시
+                                // 정렬을 위해 시간 형식 유지하되, UI에서 구분 가능하도록 처리
+                                arriveTimeStr = '00:00';
+                            }
+
+                            allLogs.push({
                                 id: fence.geofenceId,
-                                name: fence.name,
+                                location: fence.name + (fence.type === 1 ? ' (일시적)' : ' (영구)'),
                                 address: fence.address,
-                                startTime: `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`,
-                                endTime: `${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`,
+                                arriveTime: arriveTimeStr,
                                 date: dayData.date,
-                                type: 'temporary',
+                                type: 'log',
                             });
                         });
                     }
@@ -192,7 +203,7 @@ export const useCalendarData = (todayDateStr: string) => {
             map.set(date, [...items, typedItem]);
         });
         return map;
-    }, [logs, schedules, todos, photos]);
+    }, [logs, schedules, todos, photos, medicineLogs]);
 
     const hasItemsOnDate = useMemo(() => {
         const datesWithItems = new Set(itemsByDate.keys());

@@ -71,6 +71,8 @@ export interface CreateGeofenceRequest {
   type: 0 | 1;
   startTime?: string | null; // "HH:mm" 형식
   endTime?: string | null; // "HH:mm" 형식
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface GeofenceEnterRequest {
@@ -103,6 +105,7 @@ export interface CalendarGeofenceItem {
   geofenceId: number;
   name: string;
   address: string;
+  type: 0 | 1; // 0: 영구, 1: 일시
   startTime: string; // ISO string
   endTime: string; // ISO string
 }
