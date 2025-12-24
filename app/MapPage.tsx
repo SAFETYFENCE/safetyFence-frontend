@@ -65,7 +65,7 @@ const MainPage: React.FC = () => {
   if (isLoading) return <MapLoadingView />;
   if (locationError) return <MapErrorView error={locationError} />;
   if (userRole === null) return <MapLoadingView message="역할 정보를 확인 중입니다..." />;
-  if (!userLocation) return <MapLoadingView message="현재 위치를 찾는 중..." />;
+
 
   // --- 헤더 텍스트 생성 ---
   const getSupporterDisplayLabel = () => {

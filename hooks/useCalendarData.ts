@@ -4,6 +4,8 @@ import { Alert } from 'react-native';
 import Global from '../constants/Global';
 import { calendarService } from '../services/calendarService';
 import { GalleryPhoto, galleryService } from '../services/galleryService';
+import { geofenceService } from '../services/geofenceService';
+import { GeofenceItem } from '../types/api';
 import { CalendarItem, Log, MedicineLog, Schedule, Todo } from '../types/calendar';
 import { storage } from '../utils/storage';
 
@@ -13,6 +15,7 @@ export const useCalendarData = (todayDateStr: string) => {
     const [logs, setLogs] = useState<Log[]>([]);
     const [medicineLogs, setMedicineLogs] = useState<MedicineLog[]>([]);
     const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
+    const [permanentGeofences, setPermanentGeofences] = useState<GeofenceItem[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
     // 캘린더 데이터 로드
@@ -24,8 +27,17 @@ export const useCalendarData = (todayDateStr: string) => {
                 ? Global.TARGET_NUMBER
                 : undefined;
 
-            const calendarData = await calendarService.getUserData(targetNumber);
+            // 캘린더 데이터와 지오펜스 목록 동시 조회
+            const [calendarData, geofenceList] = await Promise.all([
+                calendarService.getUserData(targetNumber),
+                geofenceService.getList(targetNumber)
+            ]);
+
             console.log('UseCalendarData - Fetched Data:', JSON.stringify(calendarData, null, 2));
+
+            // 영구 지오펜스 분리 및 설정 (별도 State로 관리하여 모든 날짜에 표시)
+            const perms = geofenceList.filter(g => g.type === 0);
+            setPermanentGeofences(perms);
 
             const allSchedules: Schedule[] = [];
             const allTodos: Todo[] = [];
@@ -49,28 +61,23 @@ export const useCalendarData = (todayDateStr: string) => {
 
                     if (dayData.geofences) {
                         dayData.geofences.forEach((fence) => {
-                            let arriveTimeStr = '00:00';
-
+                            // 일시적 지오펜스만 여기서 처리 (영구 지오펜스는 별도 처리)
                             if (fence.type === 1 && fence.startTime) {
-                                // 일시적 지오펜스: 시작 시간 표시
                                 const start = new Date(fence.startTime);
+                                let arriveTimeStr = '00:00';
                                 if (!isNaN(start.getTime())) {
                                     arriveTimeStr = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`;
                                 }
-                            } else {
-                                // 영구 지오펜스: '상시' 또는 기본 시간 표시
-                                // 정렬을 위해 시간 형식 유지하되, UI에서 구분 가능하도록 처리
-                                arriveTimeStr = '00:00';
-                            }
 
-                            allLogs.push({
-                                id: fence.geofenceId,
-                                location: fence.name + (fence.type === 1 ? ' (일시적)' : ' (영구)'),
-                                address: fence.address,
-                                arriveTime: arriveTimeStr,
-                                date: dayData.date,
-                                type: 'log',
-                            });
+                                allLogs.push({
+                                    id: fence.geofenceId,
+                                    location: fence.name + ' (일시적)',
+                                    address: fence.address,
+                                    arriveTime: arriveTimeStr,
+                                    date: dayData.date,
+                                    type: 'log',
+                                });
+                            }
                         });
                     }
 
@@ -92,7 +99,7 @@ export const useCalendarData = (todayDateStr: string) => {
                                     taken: false, // 서버 이벤트는 복용 여부를 알 수 없으므로 기본값
                                     date: dayData.date,
                                     type: 'medicine'
-                                } as any); // Type assertion needed because MedicineLog definition might be slightly different
+                                } as any);
                             } else {
                                 // 일반 할 일로 처리
                                 allTodos.push({
@@ -112,7 +119,7 @@ export const useCalendarData = (todayDateStr: string) => {
             setTodos(allTodos);
             setLogs(allLogs);
 
-            // 2. 로컬 갤러리 데이터 조회 (보호자 모드일 때는 로컬 사진은 안 보임 - 본인 기기 저장소이므로)
+            // 2. 로컬 갤러리 데이터 조회
             if (Global.USER_ROLE === 'user') {
                 const galleryData = await galleryService.getPhotos();
                 setPhotos(galleryData);
@@ -120,8 +127,7 @@ export const useCalendarData = (todayDateStr: string) => {
                 setPhotos([]);
             }
 
-            // 3. 약 복용 기록 로드 (이용자/보호자 모두 볼 수 있음)
-            // 로컬 스토리지 + 서버 이벤트([약] 접두사) 병합
+            // 3. 약 복용 기록 로드
             const localMediLogs = await storage.getMedicineLogs();
             setMedicineLogs([...allMedicineLogs, ...localMediLogs]);
 
@@ -215,7 +221,19 @@ export const useCalendarData = (todayDateStr: string) => {
 
     const getSortedItemsForDate = useCallback((dateStr: string) => {
         const items = itemsByDate.get(dateStr) || [];
-        return [...items].sort((a, b) => {
+
+        // 영구 지오펜스 추가 (모든 날짜에 표시)
+        const permanentItems: CalendarItem[] = permanentGeofences.map(fence => ({
+            id: fence.id,
+            location: fence.name + ' (상시)',
+            address: fence.address,
+            arriveTime: '00:00', // 상시 표시를 위한 기본값
+            date: dateStr,
+            type: 'log',
+            itemType: 'log'
+        }));
+
+        return [...items, ...permanentItems].sort((a, b) => {
             // 정렬 우선순위: 시간 순
             const getTime = (item: CalendarItem) => {
                 if (item.itemType === 'log') return item.arriveTime;
@@ -226,7 +244,7 @@ export const useCalendarData = (todayDateStr: string) => {
             };
             return getTime(a).localeCompare(getTime(b));
         });
-    }, [itemsByDate]);
+    }, [itemsByDate, permanentGeofences]);
 
     return {
         isLoading,
