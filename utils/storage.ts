@@ -149,6 +149,8 @@ export const storage = {
         STORAGE_KEYS.USER_ROLE,
         STORAGE_KEYS.TARGET_NUMBER,
         STORAGE_KEYS.FCM_TOKEN,
+        STORAGE_KEYS.MEDICINE_LIST,
+        STORAGE_KEYS.MEDICINE_LOGS,
       ]);
     } catch (error) {
       console.error('저장소 초기화 실패:', error);
