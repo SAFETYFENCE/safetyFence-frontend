@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Clock, X } from 'lucide-react-native';
+import { Clock, X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   Alert,
@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import CustomDatePicker from './common/CustomDatePicker';
 
 interface TodoData {
   title: string;
@@ -34,12 +35,12 @@ const TodoModal: React.FC<TodoModalProps> = ({
     title: '',
     description: '',
   });
-  const [time, setTime] = useState({ hours: '09', minutes: '00' });
+  const [selectedTime, setSelectedTime] = useState(new Date(new Date().setHours(9, 0, 0, 0)));
   const [showTimePicker, setShowTimePicker] = useState(false);
 
   const handleClose = () => {
     setFormData({ title: '', description: '' });
-    setTime({ hours: '09', minutes: '00' });
+    setSelectedTime(new Date(new Date().setHours(9, 0, 0, 0)));
     setShowTimePicker(false);
     onClose();
   };
@@ -51,8 +52,8 @@ const TodoModal: React.FC<TodoModalProps> = ({
     }
 
     const dateToSave = new Date();
-    dateToSave.setHours(parseInt(time.hours, 10));
-    dateToSave.setMinutes(parseInt(time.minutes, 10));
+    dateToSave.setHours(selectedTime.getHours());
+    dateToSave.setMinutes(selectedTime.getMinutes());
 
     onSave({
       ...formData,
@@ -61,32 +62,10 @@ const TodoModal: React.FC<TodoModalProps> = ({
     handleClose();
   };
 
-  const adjustTime = (unit: 'hours' | 'minutes', increment: number) => {
-    setTime(prev => {
-      let currentValue = parseInt(prev[unit], 10);
-      let newValue: number;
-      const max = unit === 'hours' ? 23 : 59;
-      const step = unit === 'minutes' ? 5 : 1;
-
-      newValue = currentValue + (increment * step);
-
-      if (newValue < 0) newValue = max - (unit === 'minutes' ? step - 1 : 0);
-      if (newValue > max) newValue = 0;
-
-      return { ...prev, [unit]: newValue.toString().padStart(2, '0') };
-    });
-  };
-
-  const handleTimeChange = (unit: 'hours' | 'minutes', text: string) => {
-    const num = text.replace(/[^0-9]/g, '');
-    if (num === '') {
-      setTime(prev => ({ ...prev, [unit]: '00' }));
-    } else {
-      const value = parseInt(num, 10);
-      const max = unit === 'hours' ? 23 : 59;
-      if (value >= 0 && value <= max) {
-        setTime(prev => ({ ...prev, [unit]: value.toString().padStart(2, '0') }));
-      }
+  const handleTimeChange = (event: any, date?: Date) => {
+    setShowTimePicker(false);
+    if (date) {
+      setSelectedTime(date);
     }
   };
 
@@ -133,45 +112,24 @@ const TodoModal: React.FC<TodoModalProps> = ({
 
             <View className="mb-5">
               <Text className="text-sm font-medium text-gray-700 mb-2">시간</Text>
-              {!showTimePicker ? (
-                <TouchableOpacity
-                  className="flex-row items-center border border-gray-300 rounded-lg px-4 py-3"
-                  onPress={() => setShowTimePicker(true)}
-                >
-                  <Clock size={20} color="#6b7280" />
-                  <Text className="ml-3 text-base text-gray-900">{time.hours}:{time.minutes}</Text>
-                </TouchableOpacity>
-              ) : (
-                <View className="border border-gray-200 bg-gray-50 rounded-lg p-4">
-                  <View className="flex-row justify-center items-center">
-                    <View className="items-center">
-                      <TouchableOpacity onPress={() => adjustTime('hours', 1)} className="p-2"><ChevronUp size={24} color="#6b7280" /></TouchableOpacity>
-                      <TextInput
-                        className="border border-gray-300 bg-white rounded-lg w-20 h-14 text-center text-2xl font-bold text-gray-900"
-                        value={time.hours}
-                        onChangeText={(text) => handleTimeChange('hours', text)}
-                        keyboardType="number-pad"
-                        maxLength={2}
-                      />
-                      <TouchableOpacity onPress={() => adjustTime('hours', -1)} className="p-2"><ChevronDown size={24} color="#6b7280" /></TouchableOpacity>
-                    </View>
-                    <Text className="text-3xl font-bold text-gray-900 mx-2">:</Text>
-                    <View className="items-center">
-                      <TouchableOpacity onPress={() => adjustTime('minutes', 1)} className="p-2"><ChevronUp size={24} color="#6b7280" /></TouchableOpacity>
-                      <TextInput
-                        className="border border-gray-300 bg-white rounded-lg w-20 h-14 text-center text-2xl font-bold text-gray-900"
-                        value={time.minutes}
-                        onChangeText={(text) => handleTimeChange('minutes', text)}
-                        keyboardType="number-pad"
-                        maxLength={2}
-                      />
-                      <TouchableOpacity onPress={() => adjustTime('minutes', -1)} className="p-2"><ChevronDown size={24} color="#6b7280" /></TouchableOpacity>
-                    </View>
-                  </View>
-                  <TouchableOpacity className="bg-gray-200 py-2.5 rounded-lg mt-3" onPress={() => setShowTimePicker(false)}>
-                    <Text className="text-gray-800 text-center font-semibold">확인</Text>
-                  </TouchableOpacity>
-                </View>
+              <TouchableOpacity
+                className="flex-row items-center border border-gray-300 rounded-lg px-4 py-3"
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Clock size={20} color="#6b7280" />
+                <Text className="ml-3 text-base text-gray-900">
+                  {selectedTime.getHours().toString().padStart(2, '0')}:{selectedTime.getMinutes().toString().padStart(2, '0')}
+                </Text>
+              </TouchableOpacity>
+
+              {showTimePicker && (
+                <CustomDatePicker
+                  visible={true}
+                  value={selectedTime}
+                  mode="time"
+                  onChange={handleTimeChange}
+                  onClose={() => setShowTimePicker(false)}
+                />
               )}
             </View>
 

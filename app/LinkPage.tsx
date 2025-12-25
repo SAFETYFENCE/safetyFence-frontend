@@ -1,5 +1,6 @@
 import Global from '@/constants/Global';
 import { useLocation } from '@/contexts/LocationContext';
+import { Ionicons } from '@expo/vector-icons';
 import { NavigationProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import {
   Calendar as CalendarIcon, CheckSquare,
@@ -22,6 +23,7 @@ import {
   View,
 } from 'react-native';
 import BottomNavigation from '../components/BottomNavigation';
+import CustomDatePicker from '../components/common/CustomDatePicker';
 import GeofenceModal, { GeofenceData } from '../components/GeofenceModal';
 import { calendarService } from '../services/calendarService';
 import { geofenceService } from '../services/geofenceService';
@@ -62,6 +64,8 @@ const UsersScreen: React.FC = () => {
   const [batchEventDate, setBatchEventDate] = useState('');
   const [batchEventTime, setBatchEventTime] = useState('');
   const [isBatchLoading, setIsBatchLoading] = useState(false);
+  const [showBatchDatePicker, setShowBatchDatePicker] = useState(false);
+  const [showBatchTimePicker, setShowBatchTimePicker] = useState(false);
 
   // Batch Input Tab State
   const [activeBatchTab, setActiveBatchTab] = useState<'schedule' | 'medicine' | 'location'>('schedule');
@@ -217,16 +221,6 @@ const UsersScreen: React.FC = () => {
         Alert.alert('알림', '모든 필드를 입력해주세요.');
         return;
       }
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      const timeRegex = /^\d{2}:\d{2}$/;
-      if (!dateRegex.test(batchEventDate)) {
-        Alert.alert('오류', '날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)');
-        return;
-      }
-      if (!timeRegex.test(batchEventTime)) {
-        Alert.alert('오류', '시간 형식이 올바르지 않습니다. (HH:mm)');
-        return;
-      }
     } else if (activeBatchTab === 'location') {
       if (!batchGeofenceData) {
         Alert.alert('알림', '위치 정보를 설정해주세요.');
@@ -290,6 +284,8 @@ const UsersScreen: React.FC = () => {
 
             setIsSelectionMode(false);
             setSelectedUsers([]);
+            setShowBatchDatePicker(false);
+            setShowBatchTimePicker(false);
           }
         }]
       );
@@ -299,6 +295,22 @@ const UsersScreen: React.FC = () => {
       Alert.alert('오류', '일괄 등록 중 문제가 발생했습니다.');
     } finally {
       setIsBatchLoading(false);
+    }
+  };
+
+  const handleBatchDateChange = (event: any, selectedDate?: Date) => {
+    setShowBatchDatePicker(false);
+    if (selectedDate) {
+      const dateStr = `${selectedDate.getFullYear()}-${(selectedDate.getMonth() + 1).toString().padStart(2, '0')}-${selectedDate.getDate().toString().padStart(2, '0')}`;
+      setBatchEventDate(dateStr);
+    }
+  };
+
+  const handleBatchTimeChange = (event: any, selectedTime?: Date) => {
+    setShowBatchTimePicker(false);
+    if (selectedTime) {
+      const timeStr = `${selectedTime.getHours().toString().padStart(2, '0')}:${selectedTime.getMinutes().toString().padStart(2, '0')}`;
+      setBatchEventTime(timeStr);
     }
   };
 
@@ -337,8 +349,15 @@ const UsersScreen: React.FC = () => {
               <UserIcon size={26} color="#22c55e" />
             </View>
             <View className="flex-1">
-              <Text className="font-semibold text-gray-900 mb-1 text-base">{user.relation}</Text>
-              <Text className="text-sm text-gray-600">{user.userNumber}</Text>
+              <View className="flex-row items-center mb-1">
+                <Text className="font-bold text-gray-900 text-lg mr-2">{user.relation}</Text>
+                {/* 배터리 표시 (Low Battery Warning) */}
+                <View className="flex-row items-center bg-red-50 px-2.5 py-1 rounded-full border border-red-100">
+                  <Ionicons name="battery-dead" size={14} color="#dc2626" />
+                  <Text className="text-xs font-bold text-red-700 ml-1">12%</Text>
+                </View>
+              </View>
+              <Text className="text-sm text-gray-500 font-medium">{user.userNumber}</Text>
             </View>
           </View>
           <View className="flex-row items-center">
@@ -505,7 +524,7 @@ const UsersScreen: React.FC = () => {
               {/* 일정 및 약 입력 폼 */}
               {(activeBatchTab === 'schedule' || activeBatchTab === 'medicine') && (
                 <>
-                  <View>
+                  <View className="mb-6">
                     <Text className="text-sm font-bold text-gray-700 mb-2 ml-1">
                       {activeBatchTab === 'schedule' ? '일정 내용' : '약 이름'}
                     </Text>
@@ -524,29 +543,54 @@ const UsersScreen: React.FC = () => {
                   <View className="flex-row space-x-3">
                     <View className="flex-1">
                       <Text className="text-sm font-bold text-gray-700 mb-2 ml-1">날짜</Text>
-                      <View className="items-center justify-center bg-gray-50 border border-gray-200 rounded-2xl h-14">
-                        <TextInput
-                          className="text-base text-gray-900 font-bold text-center w-full"
-                          placeholder="YYYY-MM-DD"
-                          placeholderTextColor="#9ca3af"
-                          value={batchEventDate}
-                          onChangeText={setBatchEventDate}
-                          keyboardType="numbers-and-punctuation"
+                      <TouchableOpacity
+                        className="items-center justify-center bg-gray-50 border border-gray-200 rounded-2xl h-14"
+                        onPress={() => setShowBatchDatePicker(true)}
+                      >
+                        <Text className={`text-base font-bold ${batchEventDate ? 'text-gray-900' : 'text-gray-400'}`}>
+                          {batchEventDate || "YYYY-MM-DD"}
+                        </Text>
+                      </TouchableOpacity>
+                      {showBatchDatePicker && (
+                        <CustomDatePicker
+                          visible={true}
+                          value={batchEventDate ? new Date(batchEventDate) : new Date()}
+                          mode="date"
+                          onChange={handleBatchDateChange}
+                          onClose={() => setShowBatchDatePicker(false)}
                         />
-                      </View>
+                      )}
                     </View>
                     <View className="flex-1">
                       <Text className="text-sm font-bold text-gray-700 mb-2 ml-1">시간</Text>
-                      <View className="items-center justify-center bg-gray-50 border border-gray-200 rounded-2xl h-14">
-                        <TextInput
-                          className="text-base text-gray-900 font-bold text-center w-full"
-                          placeholder="HH:mm"
-                          placeholderTextColor="#9ca3af"
-                          value={batchEventTime}
-                          onChangeText={setBatchEventTime}
-                          keyboardType="numbers-and-punctuation"
+                      <TouchableOpacity
+                        className="items-center justify-center bg-gray-50 border border-gray-200 rounded-2xl h-14"
+                        onPress={() => setShowBatchTimePicker(true)}
+                      >
+                        <Text className={`text-base font-bold ${batchEventTime ? 'text-gray-900' : 'text-gray-400'}`}>
+                          {batchEventTime || "HH:mm"}
+                        </Text>
+                      </TouchableOpacity>
+                      {showBatchTimePicker && (
+                        <CustomDatePicker
+                          visible={true}
+                          value={(() => {
+                            if (batchEventTime) {
+                              const [h, m] = batchEventTime.split(':').map(Number);
+                              const d = new Date();
+                              d.setHours(h);
+                              d.setMinutes(m);
+                              return d;
+                            }
+                            const d = new Date();
+                            d.setHours(9, 0, 0, 0);
+                            return d;
+                          })()}
+                          mode="time"
+                          onChange={handleBatchTimeChange}
+                          onClose={() => setShowBatchTimePicker(false)}
                         />
-                      </View>
+                      )}
                     </View>
                   </View>
                 </>

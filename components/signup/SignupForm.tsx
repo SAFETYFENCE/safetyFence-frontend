@@ -1,9 +1,9 @@
 
 import { SignupFormData } from '@/hooks/useSignupLogic';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { Calendar, Check, Search } from 'lucide-react-native';
 import React from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
+import CustomDatePicker from '../common/CustomDatePicker';
 
 interface Props {
     formData: SignupFormData;
@@ -58,11 +58,12 @@ const SignupForm: React.FC<Props> = ({
                 </TouchableOpacity>
 
                 {showDatePicker && (
-                    <DateTimePicker
+                    <CustomDatePicker
+                        visible={true}
                         value={formData.birth || new Date()}
                         mode="date"
-                        display="default"
                         onChange={onDateChange}
+                        onClose={() => onShowDatePicker(false)}
                         maximumDate={new Date()}
                         minimumDate={new Date(1900, 0, 1)}
                     />

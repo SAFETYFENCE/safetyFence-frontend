@@ -233,27 +233,28 @@ const CalendarPage: React.FC = () => {
         </View>
 
         {/* 탭 버튼 (캘린더 아래로 이동 & 색상 차별화) */}
-        <View className="flex-row px-5 mb-4 space-x-2">
+        {/* 탭 버튼 (Segmented Control 스타일) */}
+        <View className="flex-row mx-5 mb-6 bg-gray-100 p-1 rounded-2xl">
           <TouchableOpacity
             onPress={() => setActiveTab('schedule')}
-            className={`flex-1 py-3 items-center rounded-xl ${activeTab === 'schedule' ? 'bg-green-500' : 'bg-white border border-gray-200'}`}
-            style={activeTab === 'schedule' ? { elevation: 2 } : {}}
+            className="flex-1 py-2.5 items-center rounded-xl"
+            style={activeTab === 'schedule' ? { backgroundColor: 'white', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 } : undefined}
           >
-            <Text className={`font-bold ${activeTab === 'schedule' ? 'text-white' : 'text-gray-500'}`}>일정</Text>
+            <Text className={`text-sm font-bold ${activeTab === 'schedule' ? 'text-green-600' : 'text-gray-500'}`}>일정</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setActiveTab('medicine')}
-            className={`flex-1 py-3 items-center rounded-xl ${activeTab === 'medicine' ? 'bg-blue-500' : 'bg-white border border-gray-200'}`}
-            style={activeTab === 'medicine' ? { elevation: 2 } : {}}
+            className="flex-1 py-2.5 items-center rounded-xl"
+            style={activeTab === 'medicine' ? { backgroundColor: 'white', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 } : undefined}
           >
-            <Text className={`font-bold ${activeTab === 'medicine' ? 'text-white' : 'text-gray-500'}`}>약</Text>
+            <Text className={`text-sm font-bold ${activeTab === 'medicine' ? 'text-blue-600' : 'text-gray-500'}`}>약</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setActiveTab('log')}
-            className={`flex-1 py-3 items-center rounded-xl ${activeTab === 'log' ? 'bg-orange-500' : 'bg-white border border-gray-200'}`}
-            style={activeTab === 'log' ? { elevation: 2 } : {}}
+            className="flex-1 py-2.5 items-center rounded-xl"
+            style={activeTab === 'log' ? { backgroundColor: 'white', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 } : undefined}
           >
-            <Text className={`font-bold ${activeTab === 'log' ? 'text-white' : 'text-gray-500'}`}>이동/기록</Text>
+            <Text className={`text-sm font-bold ${activeTab === 'log' ? 'text-orange-600' : 'text-gray-500'}`}>이동/기록</Text>
           </TouchableOpacity>
         </View>
 

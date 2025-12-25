@@ -18,12 +18,12 @@ const MyPageHeader: React.FC<Props> = ({ name, onBack }) => {
                         <Ionicons name="arrow-back" size={28} color="white" />
                     </TouchableOpacity>
                 ) : (
-                    <View style={{ width: 40 }} /> // 레이아웃 균형을 위한 빈 뷰
+                    <View style={{ width: 40 }} />
                 )}
 
                 <Text className="text-2xl font-bold text-white">마이페이지</Text>
 
-                <View style={{ width: 40 }} /> // 레이아웃 균형을 위한 빈 뷰
+                <View style={{ width: 40 }} />
             </View>
 
             <View className="flex-row items-center bg-white/10 p-4 rounded-3xl backdrop-blur-sm">
