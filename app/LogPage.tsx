@@ -103,5 +103,5 @@ const NotificationsPage: React.FC = () => {
     </SafeAreaView>
   );
 };
-
+//
 export default NotificationsPage;
