@@ -15,83 +15,95 @@ const THEME = {
 
 const UserMedicineCard: React.FC<UserMedicineCardProps> = ({ item }) => {
     return (
-        <View className="mb-8">
-            <View className="flex-row items-end mb-4 px-1">
-                <Text className="text-xl font-extrabold text-slate-800 mr-2">{item.user.userName}</Text>
-                <Text className="text-sm font-medium text-slate-400 mb-1">님의 복용 일정</Text>
+        <View className="mb-6">
+            <View className="flex-row items-end mb-3 px-1">
+                <Text className="text-lg font-extrabold text-gray-800 mr-2">{item.user.userName}</Text>
+                <Text className="text-sm font-medium text-gray-500 mb-1">님의 복용 일정</Text>
             </View>
 
-            <View className="bg-white rounded-[28px] p-6 shadow-sm shadow-slate-200 border border-slate-100">
+            <View className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
                 {/* User Info Header in Card */}
-                <View className="flex-row items-center justify-between mb-8">
+                <View className="flex-row items-center justify-between mb-6 pb-4 border-b border-gray-100">
                     <View className="flex-row items-center">
-                        <View className="w-12 h-12 rounded-full bg-slate-100 items-center justify-center border border-white shadow-sm overflow-hidden">
-                            <UserIcon size={24} color="#94a3b8" />
+                        <View className="w-10 h-10 rounded-full bg-gray-50 items-center justify-center border border-gray-100 mr-3">
+                            <UserIcon size={20} color="#9ca3af" />
                         </View>
-                        <View className="ml-3">
-                            <Text className="text-sm text-slate-500">연결된 계정</Text>
-                            <Text className="text-base font-bold text-slate-800">{item.user.userNumber}</Text>
+                        <View>
+                            <Text className="text-xs text-gray-400 font-medium">연결 ID</Text>
+                            <Text className="text-sm font-bold text-gray-700">{item.user.userNumber}</Text>
                         </View>
                     </View>
 
                     {/* Status Badge */}
-                    <View className={`px-3 py-1.5 rounded-full flex-row items-center ${item.totalMedications > 0 ? 'bg-teal-50' : 'bg-slate-50'}`}>
+                    <View className={`px-3 py-1.5 rounded-full flex-row items-center ${item.totalMedications > 0 && item.checkedMedications === item.totalMedications ? 'bg-green-100' : 'bg-gray-100'}`}>
                         {item.totalMedications > 0 ? (
                             <>
-                                <Sparkles size={12} color={THEME.primary} />
-                                <Text className="text-teal-700 font-bold text-xs ml-1">
-                                    {item.checkedMedications}/{item.totalMedications} 복용
+                                <Sparkles size={12} color={item.checkedMedications === item.totalMedications ? '#15803d' : '#6b7280'} />
+                                <Text className={`text-xs font-bold ml-1.5 ${item.checkedMedications === item.totalMedications ? 'text-green-700' : 'text-gray-600'}`}>
+                                    {item.checkedMedications}/{item.totalMedications} 완료
                                 </Text>
                             </>
                         ) : (
-                            <Text className="text-slate-500 font-bold text-xs">일정 없음</Text>
+                            <Text className="text-gray-500 font-bold text-xs">일정 없음</Text>
                         )}
                     </View>
                 </View>
 
                 {/* Medicine List or Empty State */}
                 {item.error ? (
-                    <View className="py-8 items-center justify-center bg-red-50 rounded-2xl border border-red-100">
-                        <Text className="text-red-500 font-medium">일정을 불러올 수 없어요</Text>
+                    <View className="py-6 items-center justify-center bg-red-50 rounded-xl border border-red-100">
+                        <Text className="text-red-500 font-medium text-sm">일정을 불러올 수 없어요</Text>
                     </View>
                 ) : item.medicines.length > 0 ? (
                     <View className="gap-3">
                         {item.medicines.map((medicine) => (
                             <View
                                 key={medicine.id}
-                                className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex-row items-center"
+                                className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex-row items-start"
                             >
-                                <View className="h-12 w-12 rounded-full bg-teal-50 items-center justify-center mr-4">
-                                    <Pill size={20} color={THEME.primary} />
+                                <View className={`h-10 w-10 rounded-lg items-center justify-center mr-3 ${medicine.checkedToday ? 'bg-green-100' : 'bg-white border border-gray-200'}`}>
+                                    <Pill size={18} color={medicine.checkedToday ? '#15803d' : '#64748b'} />
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="text-gray-900 font-bold text-lg mb-1">{medicine.name}</Text>
-                                    {medicine.dosage && medicine.dosage !== '정보 없음' && (
-                                        <Text className="text-slate-500 text-sm">용량: {medicine.dosage}</Text>
-                                    )}
-                                    {medicine.purpose && medicine.purpose !== '정보 없음' && (
-                                        <Text className="text-slate-500 text-sm">목적: {medicine.purpose}</Text>
-                                    )}
+                                    <View className="flex-row justify-between items-start">
+                                        <View>
+                                            <Text className={`text-base font-bold mb-1 ${medicine.checkedToday ? 'text-gray-900' : 'text-gray-700'}`}>
+                                                {medicine.name}
+                                            </Text>
+                                            <View className="flex-row flex-wrap gap-2">
+                                                {medicine.dosage && medicine.dosage !== '정보 없음' && (
+                                                    <Text className="text-xs text-gray-500 bg-white px-1.5 py-0.5 rounded border border-gray-200">
+                                                        {medicine.dosage}
+                                                    </Text>
+                                                )}
+                                                {medicine.purpose && medicine.purpose !== '정보 없음' && (
+                                                    <Text className="text-xs text-gray-500 bg-white px-1.5 py-0.5 rounded border border-gray-200">
+                                                        {medicine.purpose}
+                                                    </Text>
+                                                )}
+                                            </View>
+                                        </View>
+
+                                        {medicine.checkedToday ? (
+                                            <View className="bg-green-500 px-2.5 py-1 rounded-lg shadow-sm">
+                                                <Text className="text-white text-xs font-bold">복용함</Text>
+                                            </View>
+                                        ) : (
+                                            <View className="bg-gray-200 px-2.5 py-1 rounded-lg">
+                                                <Text className="text-gray-500 text-xs font-bold">미복용</Text>
+                                            </View>
+                                        )}
+                                    </View>
                                 </View>
-                                {medicine.checkedToday && (
-                                    <View className="bg-teal-600 px-3 py-1.5 rounded-lg">
-                                        <Text className="text-white text-xs font-bold">복용완료</Text>
-                                    </View>
-                                )}
-                                {!medicine.checkedToday && (
-                                    <View className="bg-slate-200 px-3 py-1.5 rounded-lg">
-                                        <Text className="text-slate-600 text-xs font-bold">미복용</Text>
-                                    </View>
-                                )}
                             </View>
                         ))}
                     </View>
                 ) : (
-                    <View className="py-10 items-center justify-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                        <View className="w-14 h-14 bg-white rounded-full items-center justify-center mb-3 shadow-sm">
-                            <CheckCircle2 size={24} color="#cbd5e1" />
+                    <View className="py-8 items-center justify-center rounded-xl border-2 border-dashed border-gray-200">
+                        <View className="w-12 h-12 bg-gray-50 rounded-full items-center justify-center mb-2">
+                            <CheckCircle2 size={20} color="#9ca3af" />
                         </View>
-                        <Text className="text-slate-400 font-medium text-base">오늘은 챙겨드릴 약이 없어요</Text>
+                        <Text className="text-gray-400 font-medium text-sm">오늘은 예정된 약이 없어요</Text>
                     </View>
                 )}
             </View>
