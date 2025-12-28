@@ -41,6 +41,18 @@ export const useSignupLogic = () => {
     const [isPostcodeMode, setIsPostcodeMode] = useState<boolean>(false);
     const [isCenterPostcodeMode, setIsCenterPostcodeMode] = useState<boolean>(false);
 
+    const [isSuccessModalVisible, setIsSuccessModalVisible] = useState<boolean>(false);
+    const [signedUpUserName, setSignedUpUserName] = useState<string>('');
+
+    const handleInputConfirm = () => {
+        try {
+            setIsSuccessModalVisible(false);
+            router.replace('/');
+        } catch (navError) {
+            router.push('/');
+        }
+    };
+
     const handleInputChange = <K extends keyof SignupFormData>(
         field: K,
         value: SignupFormData[K]
@@ -132,22 +144,9 @@ export const useSignupLogic = () => {
             await storage.setUserNumber(response.number);
             await storage.setUserName(response.name);
 
-            Alert.alert(
-                "🎉 회원가입 완료",
-                `${response.name}님, 회원가입이 성공적으로 완료되었습니다!\n로그인 페이지로 이동하여 로그인해주세요.`,
-                [
-                    {
-                        text: "확인",
-                        onPress: () => {
-                            try {
-                                router.replace('/');
-                            } catch (navError) {
-                                router.push('/');
-                            }
-                        }
-                    }
-                ]
-            );
+            setSignedUpUserName(response.name);
+            setIsSuccessModalVisible(true);
+
         } catch (error: any) {
             const message = error?.response?.data?.message || "회원가입에 실패했습니다. 다시 시도해주세요.";
             Alert.alert("회원가입 실패", message);
@@ -160,10 +159,13 @@ export const useSignupLogic = () => {
         showDatePicker,
         isPostcodeMode,
         isCenterPostcodeMode,
+        isSuccessModalVisible,
+        signedUpUserName,
         handleInputChange,
         handleAddressSelect,
         handleDateChange,
         handleSubmit,
+        handleInputConfirm,
         setShowDatePicker,
         setIsPostcodeMode,
         setIsCenterPostcodeMode

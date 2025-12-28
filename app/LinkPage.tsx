@@ -423,7 +423,7 @@ const UsersScreen: React.FC = () => {
         {isSelected && !isSelectionMode && (
           <View className="mt-4 pt-3 border-t border-green-200 flex-row items-center justify-between">
             <Text className="text-sm font-bold text-green-700 ">
-              현재 모니터링 중
+              실시간 위치 확인 중(연결중)
             </Text>
             <Ionicons name="chevron-forward" size={16} color="#15803d" />
           </View>

@@ -9,10 +9,10 @@ interface Props {
 }
 
 const TodoCard: React.FC<Props> = React.memo(({ todo, onDelete }) => (
-    <View className="bg-white rounded-xl shadow p-4 mb-3 border-l-4 border-purple-500">
+    <View className="bg-white rounded-xl shadow p-4 mb-3 border-l-4 border-green-500">
         <View className="flex-row items-start">
-            <View className="h-11 w-11 bg-purple-50 rounded-lg items-center justify-center mr-3">
-                <CheckSquare size={20} color="#8B5CF6" />
+            <View className="h-11 w-11 bg-green-50 rounded-lg items-center justify-center mr-3">
+                <CheckSquare size={20} color="#16a34a" />
             </View>
             <View className="flex-1">
                 <Text className="text-base font-bold text-gray-900 mb-1">{todo.title}</Text>
@@ -28,8 +28,8 @@ const TodoCard: React.FC<Props> = React.memo(({ todo, onDelete }) => (
                 {todo.image && (
                     <Image source={{ uri: todo.image }} className="w-full h-40 rounded-lg my-2" />
                 )}
-                <View className="self-start px-2.5 py-1 rounded-full bg-purple-100">
-                    <Text className="text-xs font-semibold text-purple-700">
+                <View className="self-start px-2.5 py-1 rounded-full bg-green-100">
+                    <Text className="text-xs font-semibold text-green-700">
                         할 일
                     </Text>
                 </View>

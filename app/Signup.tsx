@@ -2,6 +2,7 @@
 import PostcodeModal from '@/components/signup/PostcodeModal';
 import SignupForm from '@/components/signup/SignupForm';
 import SignupHeader from '@/components/signup/SignupHeader';
+import SignupSuccessModal from '@/components/signup/SignupSuccessModal';
 import { useSignupLogic } from '@/hooks/useSignupLogic';
 import React from 'react';
 import {
@@ -17,10 +18,13 @@ const SignupPage: React.FC = () => {
     showDatePicker,
     isPostcodeMode,
     isCenterPostcodeMode,
+    isSuccessModalVisible,
+    signedUpUserName,
     handleInputChange,
     handleAddressSelect,
     handleDateChange,
     handleSubmit,
+    handleInputConfirm,
     setShowDatePicker,
     setIsPostcodeMode,
     setIsCenterPostcodeMode
@@ -62,6 +66,12 @@ const SignupPage: React.FC = () => {
           title="센터 주소 검색"
           onClose={() => setIsCenterPostcodeMode(false)}
           onSelect={(data) => handleAddressSelect(data, true)}
+        />
+
+        <SignupSuccessModal
+          visible={isSuccessModalVisible}
+          userName={signedUpUserName}
+          onConfirm={handleInputConfirm}
         />
 
       </KeyboardAvoidingView>
