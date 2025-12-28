@@ -101,14 +101,14 @@ const CalendarPage: React.FC = () => {
 
   const renderItem = ({ item }: { item: CalendarItem }) => {
     if (item.itemType === 'log') {
-      return <LogCard key={`log-${item.id}`} log={item} />;
+      return <LogCard log={item} />;
     } else if (item.itemType === 'schedule') {
-      return <ScheduleCard key={`schedule-${item.id}`} schedule={item} />;
+      return <ScheduleCard schedule={item} />;
 
     } else if (item.itemType === 'medicine') {
-      return <MedicineCard key={`medicine-${item.id}`} log={item} />;
+      return <MedicineCard log={item} />;
     } else {
-      return <TodoCard key={`todo-${item.id}`} todo={item} onDelete={handleTodoDelete} />;
+      return <TodoCard todo={item} onDelete={handleTodoDelete} />;
     }
   };
 
@@ -275,7 +275,11 @@ const CalendarPage: React.FC = () => {
           </View>
 
           {sortedSelectedDateItems.length > 0 ? (
-            sortedSelectedDateItems.map(item => renderItem({ item }))
+            sortedSelectedDateItems.map(item => (
+              <React.Fragment key={`${item.itemType}-${item.id}`}>
+                {renderItem({ item })}
+              </React.Fragment>
+            ))
           ) : (
             <View className="items-center justify-center pt-16">
               <Ionicons name="calendar-outline" size={48} color="#cbd5e1" />

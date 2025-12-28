@@ -60,7 +60,7 @@ const DaumPostcode: React.FC<DaumPostcodeProps> = ({ onSubmit, onClose }) => {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
       <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';">
-      <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+      <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js" async defer></script>
       <style>
         body, html { 
           width: 100%; 
@@ -133,14 +133,21 @@ const DaumPostcode: React.FC<DaumPostcodeProps> = ({ onSubmit, onClose }) => {
           }
         }
         
-        // 다음 우편번호 API 초기화
-        function initDaumPostcode() {
+        // 다음 우편번호 API 초기화 (재시도 로직 포함)
+        function initDaumPostcode(retryCount = 0) {
           try {
             if (!window.daum || !window.daum.Postcode) {
+              // API가 아직 로드되지 않은 경우 재시도
+              if (retryCount < 10) {
+                setTimeout(function() {
+                  initDaumPostcode(retryCount + 1);
+                }, 200);
+                return;
+              }
               throw new Error('다음 우편번호 API가 로드되지 않았습니다.');
             }
-            
-            new daum.Postcode({
+
+            new window.daum.Postcode({
               oncomplete: function(data) {
                 try {
                   hideLoading();
@@ -207,16 +214,16 @@ const DaumPostcode: React.FC<DaumPostcodeProps> = ({ onSubmit, onClose }) => {
             }));
           }
           
-          // 다음 API 로딩 대기 후 초기화
-          setTimeout(initDaumPostcode, 100);
+          // 다음 API 로딩 대기 후 초기화 (재시도 로직으로 안전하게 처리)
+          setTimeout(function() { initDaumPostcode(0); }, 300);
         });
-        
+
         // 즉시 실행 (fallback)
         if (document.readyState === 'loading') {
           // DOM이 아직 로딩 중
         } else {
           // DOM이 이미 로드됨
-          setTimeout(initDaumPostcode, 100);
+          setTimeout(function() { initDaumPostcode(0); }, 300);
         }
       </script>
     </body>

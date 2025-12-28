@@ -5,6 +5,7 @@ import SignupLink from '@/components/login/SignupLink';
 import { useLoginLogic } from '@/hooks/useLoginLogic';
 import React from 'react';
 import {
+  ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -21,11 +22,25 @@ const LoginPage: React.FC = () => {
     number,
     password,
     isLoading,
+    autoLogin,
+    isCheckingAutoLogin,
     setNumber,
     setPassword,
+    setAutoLogin,
     handleLogin,
     handleSignup
   } = useLoginLogic();
+
+  // 자동 로그인 체크 중 로딩 화면
+  if (isCheckingAutoLogin) {
+    return (
+      <SafeAreaView className="flex-1 bg-white justify-center items-center">
+        <StatusBar barStyle="dark-content" backgroundColor="white" />
+        <ActivityIndicator size="large" color="#22c55e" />
+        <Text className="text-gray-600 mt-4 text-base">로그인 확인 중...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -47,8 +62,10 @@ const LoginPage: React.FC = () => {
                 number={number}
                 password={password}
                 isLoading={isLoading}
+                autoLogin={autoLogin}
                 onNumberChange={setNumber}
                 onPasswordChange={setPassword}
+                onAutoLoginChange={setAutoLogin}
                 onSubmit={handleLogin}
               />
 

@@ -17,6 +17,7 @@ const STORAGE_KEYS = {
   GEOFENCE_CACHE: '@safetyFence:geofenceCache',
   MEDICINE_LIST: '@safetyFence:medicineList',
   MEDICINE_LOGS: '@safetyFence:medicineLogs',
+  AUTO_LOGIN: '@safetyFence:autoLogin',
 } as const;
 
 interface GeofenceCache {
@@ -318,6 +319,27 @@ export const storage = {
     } catch (error) {
       console.error('약 복용 기록 초기화 실패:', error);
       throw error;
+    }
+  },
+
+  // 자동 로그인 설정 저장
+  async setAutoLogin(enabled: boolean): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.AUTO_LOGIN, JSON.stringify(enabled));
+    } catch (error) {
+      console.error('자동 로그인 설정 저장 실패:', error);
+      throw error;
+    }
+  },
+
+  // 자동 로그인 설정 가져오기
+  async getAutoLogin(): Promise<boolean> {
+    try {
+      const value = await AsyncStorage.getItem(STORAGE_KEYS.AUTO_LOGIN);
+      return value ? JSON.parse(value) : true; // 기본값 true
+    } catch (error) {
+      console.error('자동 로그인 설정 가져오기 실패:', error);
+      return true; // 기본값
     }
   }
 };

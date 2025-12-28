@@ -89,8 +89,10 @@ apiClient.interceptors.response.use(
           break;
 
         case 404:
-          console.error('리소스 없음:', message);
-          Alert.alert('오류', '요청한 정보를 찾을 수 없습니다.');
+          // 404는 에러가 아닐 수 있음 (예: 대표 보호자 미설정)
+          // 각 컴포넌트/서비스에서 필요한 경우 처리하도록 함
+          console.log('ℹ️ 리소스 없음 (404):', message);
+          // Alert 제거: 컴포넌트에서 필요시 처리
           break;
 
         case 409:
@@ -110,14 +112,14 @@ apiClient.interceptors.response.use(
     } else if (error.request) {
       // 요청은 보냈지만 응답을 받지 못함 (네트워크 오류)
       console.error('=== 네트워크 오류 상세 ===');
-      console.error('URL:', error.config?.baseURL + error.config?.url);
+      console.error('URL:', (error.config?.baseURL || '') + (error.config?.url || ''));
       console.error('Method:', error.config?.method);
       console.error('Error Message:', error.message);
       console.error('Error Code:', error.code);
       console.error('========================');
       Alert.alert(
         '네트워크 오류',
-        `서버 연결 실패\nURL: ${error.config?.url}\n에러: ${error.message}`
+        `서버 연결 실패\nURL: ${error.config?.url || '알 수 없음'}\n에러: ${error.message}`
       );
     } else {
       // 요청 설정 중 오류 발생

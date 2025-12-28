@@ -51,6 +51,28 @@ export interface DeleteLinkRequest {
   number: string;
 }
 
+// ==================== 대표 보호자 ====================
+
+export interface SupporterItem {
+  linkId: number;
+  supporterNumber: string;
+  supporterName: string;
+  relation: string;
+  isPrimary: boolean;
+}
+
+export interface PrimarySupporterResponse {
+  linkId: number;
+  supporterNumber: string;
+  supporterName: string;
+  relation: string;
+  isPrimary: boolean;
+}
+
+export interface SetPrimarySupporterRequest {
+  linkId: number;
+}
+
 // ==================== 지오펜스 ====================
 
 export interface GeofenceItem {
@@ -163,6 +185,60 @@ export interface ChangeHomeAddressRequest {
 export interface ChangeCenterAddressRequest {
   centerAddress: string;
   centerStreetAddress: string;
+}
+
+// ==================== 약 관리 ====================
+
+export interface MedicationItem {
+  id: number;
+  name: string;
+  dosage: string;
+  purpose: string;
+  frequency: string;
+  checkedToday?: boolean;
+  checkCount?: number; // 오늘 복용 횟수
+}
+
+export interface MedicationListResponse {
+  checkDate: string;
+  medications: MedicationItem[];
+}
+
+export interface CreateMedicationRequest {
+  name: string;
+  dosage: string;
+  purpose: string;
+  frequency: string;
+}
+
+export interface MedicationCheckResponse {
+  message: string;
+  medicationId: number;
+  checkedDateTime: string;
+}
+
+export interface MedicationUncheckResponse {
+  message: string;
+  medicationId: number;
+}
+
+export interface MedicationHistoryItem {
+  logId: number;
+  checkedDateTime: string;
+}
+
+export interface MedicationHistoryResponse {
+  medicationId: number;
+  medicationName: string;
+  history: MedicationHistoryItem[];
+}
+
+export interface WardMedicationData {
+  wardNumber: string;
+  wardName: string;
+  medications: MedicationItem[];
+  totalMedications: number;
+  checkedMedications: number;
 }
 
 // ==================== 에러 응답 ====================

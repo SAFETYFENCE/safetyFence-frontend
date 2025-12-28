@@ -1,5 +1,6 @@
 import Global from '@/constants/Global';
 import { useLocation } from '@/contexts/LocationContext';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { Shield, User } from 'lucide-react-native';
 import React, { useState } from 'react';
@@ -39,6 +40,21 @@ export default function SelectRolePage() {
         } else if (Global.USER_ROLE === 'supporter') {
           await stopTracking();
           await disconnectWebSocket();
+
+          // 보호자도 지오펜스 설정 등을 위해 위치 권한 필요
+          try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert(
+                '위치 권한 필요',
+                '지오펜스 설정 등의 기능을 사용하려면 위치 권한이 필요합니다.',
+                [{ text: '확인' }]
+              );
+            }
+          } catch (permError) {
+            console.warn('⚠️ 보호자 위치 권한 요청 실패:', permError);
+          }
+
           router.replace('/LinkPage');
         }
 

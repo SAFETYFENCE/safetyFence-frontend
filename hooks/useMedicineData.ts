@@ -1,13 +1,17 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
-import { calendarService } from '../services/calendarService';
-import { linkService } from '../services/linkService';
-import { CalendarEventItem, LinkItem } from '../types/api';
+import { medicationService } from '../services/medicationService';
+import type { MedicationItem } from '../types/api';
 
 export interface UserMedicineData {
-    user: LinkItem;
-    medicines: CalendarEventItem[];
+    user: {
+        userNumber: string;
+        userName: string;
+    };
+    medicines: MedicationItem[];
+    totalMedications: number;
+    checkedMedications: number;
     loading: boolean;
     error: boolean;
 }
@@ -21,58 +25,24 @@ export const useMedicineData = () => {
 
     const fetchData = useCallback(async () => {
         try {
-            const users = await linkService.getList();
+            // 날짜를 yyyy-MM-dd 형식으로 변환
+            const dateStr = `${selectedDate.getFullYear()}-${(selectedDate.getMonth() + 1).toString().padStart(2, '0')}-${selectedDate.getDate().toString().padStart(2, '0')}`;
 
-            if (users.length === 0) {
-                setUserMedicineList([]);
-                setLoading(false);
-                return;
-            }
+            const wards = await medicationService.getWardsToday(dateStr);
 
-            const targetDateStr = `${selectedDate.getFullYear()}-${(selectedDate.getMonth() + 1).toString().padStart(2, '0')}-${selectedDate.getDate().toString().padStart(2, '0')}`;
-
-            const promises = users.map(async (user) => {
-                try {
-                    const calendarData = await calendarService.getUserData(user.userNumber);
-                    const dayData = calendarData.find(day => day.date === targetDateStr);
-
-                    const medicines = dayData?.userEvents.filter(event =>
-                        event.event.startsWith('[약]') || event.event.startsWith('[Medicine]')
-                    ) || [];
-
-                    // 시간순 정렬 (HH:mm)
-                    medicines.sort((a, b) => a.eventStartTime.localeCompare(b.eventStartTime));
-
-                    const processedMedicines = medicines.map(m => ({
-                        ...m,
-                        displayEvent: m.event.replace(/^\[.*?\]\s*/, '')
-                    }));
-
-                    return {
-                        user,
-                        medicines: processedMedicines,
-                        loading: false,
-                        error: false
-                    };
-                } catch (error) {
-                    console.error(`Failed to fetch data for user ${user.userNumber}:`, error);
-                    return {
-                        user,
-                        medicines: [],
-                        loading: false,
-                        error: true
-                    };
-                }
-            });
-
-            const results = await Promise.all(promises);
-
-            const finalResults: UserMedicineData[] = results.map(r => ({
-                ...r,
-                medicines: r.medicines.map(m => ({ ...m, event: m.displayEvent ? m.displayEvent : m.event }))
+            const userMedicineData: UserMedicineData[] = wards.map(ward => ({
+                user: {
+                    userNumber: ward.wardNumber,
+                    userName: ward.wardName,
+                },
+                medicines: ward.medications,
+                totalMedications: ward.totalMedications,
+                checkedMedications: ward.checkedMedications,
+                loading: false,
+                error: false,
             }));
 
-            setUserMedicineList(finalResults);
+            setUserMedicineList(userMedicineData);
         } catch (error) {
             console.error('데이터 불러오기 실패:', error);
             Alert.alert('오류', '데이터를 불러오는데 실패했습니다.');

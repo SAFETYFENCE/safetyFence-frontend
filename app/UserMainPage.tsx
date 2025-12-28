@@ -1,24 +1,42 @@
 import { useLocation } from '@/contexts/LocationContext';
+import { useMedicationManagement } from '@/hooks/useMedicationManagement';
+import { emergencyService } from '@/services/emergencyService';
+import { linkService } from '@/services/linkService';
 import { storage } from '@/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StatusBar, Text, ToastAndroid, TouchableOpacity, View } from 'react-native';
+import { Alert, Linking, ScrollView, StatusBar, Text, ToastAndroid, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import RNImmediatePhoneCall from 'react-native-phone-call';
 import MedicineManager from '../components/senior/MedicineManager';
 import TopHeader from '../components/senior/TopHeader';
 
 export default function UserMainPage() {
     const router = useRouter();
-    const { isWebSocketConnected } = useLocation();
+    const { isWebSocketConnected, isTracking, startTracking } = useLocation();
     const [userName, setUserName] = useState('');
-    const [medicineList, setMedicineList] = useState<string[]>([]);
     const [isMedicineManagerVisible, setIsMedicineManagerVisible] = useState(false);
-    const [takenMedicines, setTakenMedicines] = useState<string[]>([]);
+
+    // API 기반 약 관리
+    const {
+        medications,
+        loading: medicationsLoading,
+        checkMedication,
+        uncheckMedication,
+        fetchMedications,
+    } = useMedicationManagement();
 
     useEffect(() => {
         loadUserData();
-        loadMedicineList();
+
+        // 자동 로그인 후 위치 추적이 시작되지 않았으면 시작
+        if (!isTracking) {
+            console.log('📍 UserMainPage: 위치 추적 시작');
+            startTracking().catch((error) => {
+                console.error('📍 UserMainPage: 위치 추적 시작 실패:', error);
+            });
+        }
     }, []);
 
     const loadUserData = async () => {
@@ -26,42 +44,27 @@ export default function UserMainPage() {
         if (name) setUserName(name);
     };
 
-    const loadMedicineList = async () => {
-        const list = await storage.getMedicineList();
-        setMedicineList(list);
-    };
-
-    const handleUpdateMedicineList = (newList: string[]) => {
-        setMedicineList(newList);
-    };
-
-    const handleMedicineRecord = async (medicineName: string, timeSlot?: string) => {
+    const handleAddMedicationRecord = async (medicationId: number) => {
         try {
-            const now = new Date();
-            const logName = timeSlot ? `${medicineName} (${timeSlot})` : medicineName;
-
-            const log = {
-                id: Date.now(),
-                medicineName: logName,
-                time: now.toISOString(),
-                date: `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`,
-                type: 'medicine',
-            };
-
-            await storage.addMedicineLog(log);
-
-            // UI 상태 업데이트
-            if (timeSlot) {
-                const key = `${medicineName}-${timeSlot}`;
-                setTakenMedicines(prev => [...prev, key]);
-            } else {
-                setTakenMedicines(prev => [...prev, medicineName]); // Legacy fallback
+            const success = await checkMedication(medicationId);
+            if (success) {
+                ToastAndroid.show('복용 기록이 추가되었습니다.', ToastAndroid.SHORT);
             }
-
-            ToastAndroid.show(`${logName} 복용이 기록되었습니다.`, ToastAndroid.SHORT);
         } catch (error) {
-            console.error('약 복용 기록 실패:', error);
-            Alert.alert('오류', '기록에 실패했습니다.');
+            console.error('복용 기록 추가 실패:', error);
+            Alert.alert('오류', '복용 기록 추가에 실패했습니다.');
+        }
+    };
+
+    const handleRemoveMedicationRecord = async (medicationId: number) => {
+        try {
+            const success = await uncheckMedication(medicationId);
+            if (success) {
+                ToastAndroid.show('최근 복용 기록이 삭제되었습니다.', ToastAndroid.SHORT);
+            }
+        } catch (error) {
+            console.error('복용 기록 삭제 실패:', error);
+            Alert.alert('오류', '복용 기록 삭제에 실패했습니다.');
         }
     };
 
@@ -75,7 +78,49 @@ export default function UserMainPage() {
                     text: '호출하기',
                     style: 'destructive',
                     onPress: async () => {
-                        Alert.alert('알림', '보호자에게 긴급 알림을 보냈습니다.');
+                        try {
+                            // 1. 긴급 알림 전송
+                            await emergencyService.sendAlert();
+                            Alert.alert('알림', '보호자에게 긴급 알림을 보냈습니다.');
+
+                            // 2. 대표 보호자 정보 조회 및 전화 걸기 (주석처리)
+                            // try {
+                            //     const primarySupporter = await linkService.getPrimarySupporter();
+                            //     console.log('🔍 대표 보호자 정보:', primarySupporter);
+                            //     console.log('📞 원본 전화번호:', primarySupporter.supporterNumber);
+
+                            //     // 전화번호에서 숫자만 추출 (하이픈 등 제거)
+                            //     const phoneNumber = primarySupporter.supporterNumber.replace(/[^0-9]/g, '');
+                            //     console.log('📞 정제된 전화번호:', phoneNumber);
+
+                            //     // react-native-phone-call 라이브러리 사용
+                            //     const args = {
+                            //         number: phoneNumber,
+                            //         prompt: true  // 다이얼러를 열고 사용자가 직접 통화 버튼 누르도록
+                            //     };
+
+                            //     console.log('📱 전화 걸기 시작:', args);
+                            //     RNImmediatePhoneCall(args).then(() => {
+                            //         console.log('✅ 전화 앱 열기 성공');
+                            //         Alert.alert('알림', '보호자에게 긴급 알림을 보내고 전화를 연결했습니다.');
+                            //     }).catch((error) => {
+                            //         console.error('❌ 전화 앱 열기 실패:', error);
+                            //         Alert.alert('알림', '긴급 알림을 보냈습니다.\n(전화 연결 실패)');
+                            //     });
+                            // } catch (error: any) {
+                            //     if (error.response?.status === 404) {
+                            //         Alert.alert(
+                            //             '알림',
+                            //             '긴급 알림을 보냈습니다.\n\n대표 보호자가 설정되지 않아 자동 전화 연결이 불가능합니다.\n마이페이지에서 대표 보호자를 설정해주세요.'
+                            //         );
+                            //     } else {
+                            //         Alert.alert('알림', '긴급 알림을 보냈습니다.\n(전화 연결 실패)');
+                            //     }
+                            // }
+                        } catch (error) {
+                            console.error('긴급 호출 실패:', error);
+                            Alert.alert('오류', '긴급 호출에 실패했습니다. 다시 시도해주세요.');
+                        }
                     },
                 },
             ]
@@ -181,7 +226,7 @@ export default function UserMainPage() {
                         </View>
                     </View>
 
-                    {medicineList.length === 0 ? (
+                    {medications.length === 0 ? (
                         <TouchableOpacity
                             onPress={() => setIsMedicineManagerVisible(true)}
                             className="bg-white/80 rounded-2xl p-6 items-center justify-center border-2 border-dashed border-blue-200"
@@ -191,30 +236,53 @@ export default function UserMainPage() {
                         </TouchableOpacity>
                     ) : (
                         <View className="flex-row flex-wrap gap-3">
-                            {medicineList.map((medicine, index) => {
-                                const isTaken = takenMedicines.includes(medicine);
+                            {medications.map((medication) => {
+                                const checkCount = medication.checkCount || 0;
                                 return (
-                                    <TouchableOpacity
-                                        key={index}
-                                        onPress={() => !isTaken && handleMedicineRecord(medicine)}
-                                        activeOpacity={isTaken ? 1 : 0.7}
-                                        className={`w-full border rounded-3xl px-6 py-5 shadow-sm flex-row justify-between items-center ${isTaken ? 'bg-blue-100 border-blue-300' : 'bg-white border-blue-100 active:bg-blue-50'
-                                            }`}
+                                    <View
+                                        key={medication.id}
+                                        className="w-full bg-white border border-blue-100 rounded-3xl px-6 py-5 shadow-sm"
                                     >
-                                        <View>
-                                            <Text className={`text-2xl font-bold mb-1 ${isTaken ? 'text-blue-800' : 'text-gray-900'}`}>
-                                                {medicine}
-                                            </Text>
-                                            <Text className={`text-base font-bold ${isTaken ? 'text-blue-600' : 'text-blue-500'}`}>
-                                                {isTaken ? '복용 완료' : '눌러서 복용 확인'}
-                                            </Text>
+                                        <View className="flex-row justify-between items-start">
+                                            <View className="flex-1">
+                                                <Text className="text-2xl font-bold mb-1 text-gray-900">
+                                                    {medication.name}
+                                                </Text>
+                                                <View className="flex-row items-center gap-2 flex-wrap mb-2">
+                                                    {medication.dosage && medication.dosage !== '정보 없음' && (
+                                                        <Text className="text-sm text-gray-500 font-medium">용량: {medication.dosage}</Text>
+                                                    )}
+                                                    {medication.frequency && medication.frequency !== '정보 없음' && (
+                                                        <Text className="text-sm text-gray-500 font-medium">• {medication.frequency}</Text>
+                                                    )}
+                                                </View>
+                                                {checkCount > 0 && (
+                                                    <Text className="text-base font-bold text-blue-600">
+                                                        ✓ 오늘 {checkCount}회 복용
+                                                    </Text>
+                                                )}
+                                            </View>
+
+                                            <View className="flex-row gap-2 ml-3">
+                                                <TouchableOpacity
+                                                    onPress={() => handleAddMedicationRecord(medication.id)}
+                                                    activeOpacity={0.7}
+                                                    className="bg-blue-600 w-12 h-12 rounded-full items-center justify-center"
+                                                >
+                                                    <Ionicons name="add" size={24} color="#ffffff" />
+                                                </TouchableOpacity>
+                                                {checkCount > 0 && (
+                                                    <TouchableOpacity
+                                                        onPress={() => handleRemoveMedicationRecord(medication.id)}
+                                                        activeOpacity={0.7}
+                                                        className="bg-red-100 w-12 h-12 rounded-full items-center justify-center"
+                                                    >
+                                                        <Ionicons name="remove" size={24} color="#ef4444" />
+                                                    </TouchableOpacity>
+                                                )}
+                                            </View>
                                         </View>
-                                        <Ionicons
-                                            name={isTaken ? "checkbox" : "square-outline"}
-                                            size={40}
-                                            color={isTaken ? "#2563eb" : "#bfdbfe"}
-                                        />
-                                    </TouchableOpacity>
+                                    </View>
                                 );
                             })}
                         </View>
@@ -227,9 +295,10 @@ export default function UserMainPage() {
 
             <MedicineManager
                 visible={isMedicineManagerVisible}
-                onClose={() => setIsMedicineManagerVisible(false)}
-                medicineList={medicineList}
-                onUpdateList={handleUpdateMedicineList}
+                onClose={() => {
+                    setIsMedicineManagerVisible(false);
+                    fetchMedications(); // 모달 닫을 때 약 목록 새로고침
+                }}
             />
         </SafeAreaView>
     );

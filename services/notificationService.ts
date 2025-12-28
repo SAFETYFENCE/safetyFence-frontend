@@ -16,6 +16,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -204,7 +206,9 @@ export const setupNotificationListeners = () => {
   // 알림 클릭 시
   const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
     console.log('🔔 알림 클릭:', response);
-    const { elderNumber, type } = response.notification.request.content.data || {};
+    const data = response.notification.request.content.data as { elderNumber?: string; type?: string } | undefined;
+    const elderNumber = data?.elderNumber;
+    const type = data?.type;
 
     if (type === 'emergency' && elderNumber) {
       console.log(`🚨 긴급 알림 클릭: 어르신 번호=${elderNumber}`);

@@ -1,15 +1,17 @@
 
-import { ChevronRight, LogOut, Settings, Shield, User } from 'lucide-react-native';
+import { ChevronRight, Home, LogOut, MapPin, Settings, Shield, User } from 'lucide-react-native';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 interface Props {
     onPasswordChange: () => void;
+    onHomeAddressChange?: () => void;
+    onCenterAddressChange?: () => void;
     onPrivacyPolicy: () => void;
     onLogout: () => void;
 }
 
-const SettingsCard: React.FC<Props> = ({ onPasswordChange, onPrivacyPolicy, onLogout }) => {
+const SettingsCard: React.FC<Props> = ({ onPasswordChange, onHomeAddressChange, onCenterAddressChange, onPrivacyPolicy, onLogout }) => {
     return (
         <View className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 mb-6">
             <View className="flex-row items-center mb-4">
@@ -30,6 +32,32 @@ const SettingsCard: React.FC<Props> = ({ onPasswordChange, onPrivacyPolicy, onLo
                     </View>
                     <ChevronRight size={16} color="#9ca3af" />
                 </TouchableOpacity>
+
+                {onHomeAddressChange && (
+                    <TouchableOpacity
+                        onPress={onHomeAddressChange}
+                        className="flex-row items-center justify-between py-3 px-2 active:bg-gray-50 rounded-xl"
+                    >
+                        <View className="flex-row items-center">
+                            <View className="w-8 items-center"><Home size={18} color="#4b5563" /></View>
+                            <Text className="font-medium text-gray-700">집 주소 변경</Text>
+                        </View>
+                        <ChevronRight size={16} color="#9ca3af" />
+                    </TouchableOpacity>
+                )}
+
+                {onCenterAddressChange && (
+                    <TouchableOpacity
+                        onPress={onCenterAddressChange}
+                        className="flex-row items-center justify-between py-3 px-2 active:bg-gray-50 rounded-xl"
+                    >
+                        <View className="flex-row items-center">
+                            <View className="w-8 items-center"><MapPin size={18} color="#4b5563" /></View>
+                            <Text className="font-medium text-gray-700">센터 주소 변경</Text>
+                        </View>
+                        <ChevronRight size={16} color="#9ca3af" />
+                    </TouchableOpacity>
+                )}
 
                 <TouchableOpacity
                     onPress={onPrivacyPolicy}

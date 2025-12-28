@@ -13,7 +13,9 @@ import {
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -28,6 +30,7 @@ import GeofenceModal, { GeofenceData } from '../components/GeofenceModal';
 import { calendarService } from '../services/calendarService';
 import { geofenceService } from '../services/geofenceService';
 import { linkService } from '../services/linkService';
+import { medicationService } from '../services/medicationService';
 
 interface UserItem {
   id: number;
@@ -70,7 +73,12 @@ const UsersScreen: React.FC = () => {
   // Batch Input Tab State
   const [activeBatchTab, setActiveBatchTab] = useState<'schedule' | 'medicine' | 'location'>('schedule');
 
-  // Location Batch State
+  // Medicine Batch State
+  const [batchMedicineName, setBatchMedicineName] = useState('');
+  const [batchMedicineDosage, setBatchMedicineDosage] = useState('');
+  const [batchMedicinePurpose, setBatchMedicinePurpose] = useState('');
+  const [batchMedicineFrequency, setBatchMedicineFrequency] = useState('');
+
   // Location Batch State
   const [isGeofenceModalOpen, setIsGeofenceModalOpen] = useState(false);
   const [batchGeofenceData, setBatchGeofenceData] = useState<GeofenceData | null>(null);
@@ -216,9 +224,14 @@ const UsersScreen: React.FC = () => {
 
   const handleBatchSubmit = async () => {
     // Validation
-    if (activeBatchTab === 'schedule' || activeBatchTab === 'medicine') {
+    if (activeBatchTab === 'schedule') {
       if (!batchEventTitle || !batchEventDate || !batchEventTime) {
         Alert.alert('알림', '모든 필드를 입력해주세요.');
+        return;
+      }
+    } else if (activeBatchTab === 'medicine') {
+      if (!batchMedicineName) {
+        Alert.alert('알림', '약 이름을 입력해주세요.');
         return;
       }
     } else if (activeBatchTab === 'location') {
@@ -242,10 +255,11 @@ const UsersScreen: React.FC = () => {
               startTime: batchEventTime
             }, userNumber);
           } else if (activeBatchTab === 'medicine') {
-            await calendarService.addEvent({
-              event: `[약] ${batchEventTitle}`,
-              eventDate: batchEventDate,
-              startTime: batchEventTime
+            await medicationService.create({
+              name: batchMedicineName,
+              dosage: batchMedicineDosage || '정보 없음',
+              purpose: batchMedicinePurpose || '정보 없음',
+              frequency: batchMedicineFrequency || '정보 없음',
             }, userNumber);
           } else if (activeBatchTab === 'location' && batchGeofenceData) {
             const formatTime = (date?: Date) => {
@@ -280,6 +294,10 @@ const UsersScreen: React.FC = () => {
             setBatchEventTitle('');
             setBatchEventDate('');
             setBatchEventTime('');
+            setBatchMedicineName('');
+            setBatchMedicineDosage('');
+            setBatchMedicinePurpose('');
+            setBatchMedicineFrequency('');
             setBatchGeofenceData(null);
 
             setIsSelectionMode(false);
@@ -463,7 +481,7 @@ const UsersScreen: React.FC = () => {
             className="bg-green-500 px-5 py-2.5 rounded-xl flex-row items-center"
           >
             <CalendarIcon size={20} color="white" />
-            <Text className="text-white font-bold ml-2">일정 등록</Text>
+            <Text className="text-white font-bold ml-2">동시 추가</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -472,12 +490,17 @@ const UsersScreen: React.FC = () => {
 
       {/* 일괄 등록 모달 */}
       <Modal visible={isBatchModalOpen} transparent animationType="fade" onRequestClose={() => setIsBatchModalOpen(false)}>
-        <View className="flex-1 bg-black/60 justify-center px-5">
-          <View className="bg-white rounded-3xl p-6 shadow-2xl">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <View className="flex-1 bg-black/60 justify-center px-5">
+            <View className="bg-white rounded-3xl p-6 shadow-2xl" style={{ maxHeight: '80%' }}>
+              <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
             <View className="flex-row justify-between items-center mb-6">
               <View>
                 <Text className="text-xl font-bold text-gray-900">
-                  일괄 등록
+                  동시 추가
                 </Text>
                 <Text className="text-sm text-green-600 font-bold mt-1">
                   선택된 {selectedUsers.length}명의 이용자에게 등록합니다
@@ -521,18 +544,16 @@ const UsersScreen: React.FC = () => {
             </View>
 
             <View className="space-y-5">
-              {/* 일정 및 약 입력 폼 */}
-              {(activeBatchTab === 'schedule' || activeBatchTab === 'medicine') && (
+              {/* 일정 입력 폼 */}
+              {activeBatchTab === 'schedule' && (
                 <>
                   <View className="mb-6">
-                    <Text className="text-sm font-bold text-gray-700 mb-2 ml-1">
-                      {activeBatchTab === 'schedule' ? '일정 내용' : '약 이름'}
-                    </Text>
+                    <Text className="text-sm font-bold text-gray-700 mb-2 ml-1">일정 내용</Text>
                     <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-2xl px-4 h-14">
                       <CalendarIcon size={20} color="#6b7280" />
                       <TextInput
                         className="flex-1 ml-3 text-base text-gray-900 font-medium"
-                        placeholder={activeBatchTab === 'schedule' ? "예: 정기 검진, 병원 방문" : "예: 아침 약, 혈압약"}
+                        placeholder="예: 정기 검진, 병원 방문"
                         placeholderTextColor="#9ca3af"
                         value={batchEventTitle}
                         onChangeText={setBatchEventTitle}
@@ -591,6 +612,64 @@ const UsersScreen: React.FC = () => {
                           onClose={() => setShowBatchTimePicker(false)}
                         />
                       )}
+                    </View>
+                  </View>
+                </>
+              )}
+
+              {/* 약 입력 폼 */}
+              {activeBatchTab === 'medicine' && (
+                <>
+                  <View className="mb-4">
+                    <Text className="text-sm font-bold text-gray-700 mb-2 ml-1">약 이름 *</Text>
+                    <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-2xl px-4 h-14">
+                      <CalendarIcon size={20} color="#6b7280" />
+                      <TextInput
+                        className="flex-1 ml-3 text-base text-gray-900 font-medium"
+                        placeholder="예: 혈압약, 당뇨약"
+                        placeholderTextColor="#9ca3af"
+                        value={batchMedicineName}
+                        onChangeText={setBatchMedicineName}
+                      />
+                    </View>
+                  </View>
+
+                  <View className="mb-4">
+                    <Text className="text-sm font-bold text-gray-700 mb-2 ml-1">용량 (선택)</Text>
+                    <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-2xl px-4 h-14">
+                      <TextInput
+                        className="flex-1 text-base text-gray-900 font-medium"
+                        placeholder="예: 100mg, 1정"
+                        placeholderTextColor="#9ca3af"
+                        value={batchMedicineDosage}
+                        onChangeText={setBatchMedicineDosage}
+                      />
+                    </View>
+                  </View>
+
+                  <View className="mb-4">
+                    <Text className="text-sm font-bold text-gray-700 mb-2 ml-1">복용 목적 (선택)</Text>
+                    <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-2xl px-4 h-14">
+                      <TextInput
+                        className="flex-1 text-base text-gray-900 font-medium"
+                        placeholder="예: 혈압 조절, 혈당 관리"
+                        placeholderTextColor="#9ca3af"
+                        value={batchMedicinePurpose}
+                        onChangeText={setBatchMedicinePurpose}
+                      />
+                    </View>
+                  </View>
+
+                  <View className="mb-4">
+                    <Text className="text-sm font-bold text-gray-700 mb-2 ml-1">복용 빈도 (선택)</Text>
+                    <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-2xl px-4 h-14">
+                      <TextInput
+                        className="flex-1 text-base text-gray-900 font-medium"
+                        placeholder="예: 하루 2회, 아침 저녁 식후"
+                        placeholderTextColor="#9ca3af"
+                        value={batchMedicineFrequency}
+                        onChangeText={setBatchMedicineFrequency}
+                      />
                     </View>
                   </View>
                 </>
@@ -657,8 +736,10 @@ const UsersScreen: React.FC = () => {
                 <Text className="font-bold text-white text-lg">{isBatchLoading ? '등록 중...' : '등록하기'}</Text>
               </TouchableOpacity>
             </View>
+              </ScrollView>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal >
 
       <GeofenceModal

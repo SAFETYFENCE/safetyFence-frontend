@@ -4,16 +4,15 @@ import { Alert } from 'react-native';
 import Global from '../constants/Global';
 import { calendarService } from '../services/calendarService';
 import { geofenceService } from '../services/geofenceService';
+import { medicationService } from '../services/medicationService';
 import { GeofenceItem } from '../types/api';
 import { CalendarItem, Log, MedicineLog, Schedule, Todo } from '../types/calendar';
-import { storage } from '../utils/storage';
 
 export const useCalendarData = (todayDateStr: string) => {
     const [schedules, setSchedules] = useState<Schedule[]>([]);
     const [todos, setTodos] = useState<Todo[]>([]);
     const [logs, setLogs] = useState<Log[]>([]);
     const [medicineLogs, setMedicineLogs] = useState<MedicineLog[]>([]);
-    const [permanentGeofences, setPermanentGeofences] = useState<GeofenceItem[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
     // 캘린더 데이터 로드
@@ -33,14 +32,9 @@ export const useCalendarData = (todayDateStr: string) => {
 
             console.log('UseCalendarData - Fetched Data:', JSON.stringify(calendarData, null, 2));
 
-            // 영구 지오펜스 분리 및 설정 (별도 State로 관리하여 모든 날짜에 표시)
-            const perms = geofenceList.filter(g => g.type === 0);
-            setPermanentGeofences(perms);
-
             const allSchedules: Schedule[] = [];
             const allTodos: Todo[] = [];
             const allLogs: Log[] = [];
-            const allMedicineLogs: MedicineLog[] = [];
 
             if (calendarData) {
                 calendarData.forEach((dayData) => {
@@ -68,7 +62,7 @@ export const useCalendarData = (todayDateStr: string) => {
                                 }
 
                                 allLogs.push({
-                                    id: fence.geofenceId,
+                                    id: `temp-${fence.geofenceId}` as any,
                                     location: fence.name + ' (일시적)',
                                     address: fence.address,
                                     arriveTime: arriveTimeStr,
@@ -87,27 +81,14 @@ export const useCalendarData = (todayDateStr: string) => {
                             time.setMinutes(minutes);
                             time.setSeconds(0);
 
-                            if (event.event.startsWith('[약]')) {
-                                // 약 복용 기록으로 처리
-                                const medicineName = event.event.replace('[약]', '').trim();
-                                allMedicineLogs.push({
-                                    id: event.userEventId,
-                                    medicineName: medicineName,
-                                    time: time,
-                                    taken: false, // 서버 이벤트는 복용 여부를 알 수 없으므로 기본값
-                                    date: dayData.date,
-                                    type: 'medicine'
-                                } as any);
-                            } else {
-                                // 일반 할 일로 처리
-                                allTodos.push({
-                                    id: event.userEventId,
-                                    title: event.event,
-                                    time,
-                                    date: dayData.date,
-                                    type: 'todo',
-                                });
-                            }
+                            // 모든 이벤트를 할 일로 처리 (약은 백엔드 medication API 사용)
+                            allTodos.push({
+                                id: event.userEventId,
+                                title: event.event,
+                                time,
+                                date: dayData.date,
+                                type: 'todo',
+                            });
                         });
                     }
                 });
@@ -117,11 +98,57 @@ export const useCalendarData = (todayDateStr: string) => {
             setTodos(allTodos);
             setLogs(allLogs);
 
+            // 3. 약 복용 기록 로드 (백엔드 API)
+            const medicationHistoryLogs: MedicineLog[] = [];
+            try {
+                let medications: any[] = [];
 
+                // 보호자가 피보호자의 캘린더를 볼 때
+                if (Global.USER_ROLE === 'supporter' && targetNumber) {
+                    // 보호자용 API로 피보호자들의 약 조회
+                    const wards = await medicationService.getWardsToday();
+                    // TARGET_NUMBER와 일치하는 피보호자의 약만 필터링
+                    const targetWard = wards.find(ward => ward.wardNumber === targetNumber);
+                    medications = targetWard ? targetWard.medications : [];
+                } else {
+                    // 이용자 본인의 약 조회
+                    const medicationsResponse = await medicationService.getList();
+                    medications = medicationsResponse.medications;
+                }
 
-            // 3. 약 복용 기록 로드
-            const localMediLogs = await storage.getMedicineLogs();
-            setMedicineLogs([...allMedicineLogs, ...localMediLogs]);
+                // 각 약의 복용 이력 조회 (병렬 처리)
+                const historyPromises = medications.map(async (medication) => {
+                    try {
+                        const historyResponse = await medicationService.getHistory(medication.id);
+                        return historyResponse.history.map((historyItem) => {
+                            const checkedTime = new Date(historyItem.checkedDateTime);
+                            const dateStr = `${checkedTime.getFullYear()}-${(checkedTime.getMonth() + 1).toString().padStart(2, '0')}-${checkedTime.getDate().toString().padStart(2, '0')}`;
+
+                            return {
+                                id: historyItem.logId,
+                                medicineName: medication.name,
+                                time: checkedTime,
+                                taken: true,
+                                date: dateStr,
+                                type: 'medicine'
+                            } as MedicineLog;
+                        });
+                    } catch (error) {
+                        console.error(`약 ${medication.name} 이력 조회 실패:`, error);
+                        return [];
+                    }
+                });
+
+                const allHistories = await Promise.all(historyPromises);
+                allHistories.forEach(histories => {
+                    medicationHistoryLogs.push(...histories);
+                });
+            } catch (error) {
+                console.error('약 복용 이력 로드 실패:', error);
+            }
+
+            // 백엔드 API의 약 복용 이력만 사용
+            setMedicineLogs(medicationHistoryLogs);
 
         } catch (error) {
             console.error('캘린더 데이터 로드 실패:', error);
@@ -214,18 +241,10 @@ export const useCalendarData = (todayDateStr: string) => {
     const getSortedItemsForDate = useCallback((dateStr: string) => {
         const items = itemsByDate.get(dateStr) || [];
 
-        // 영구 지오펜스 추가 (모든 날짜에 표시)
-        const permanentItems: CalendarItem[] = permanentGeofences.map(fence => ({
-            id: fence.id,
-            location: fence.name + ' (상시)',
-            address: fence.address,
-            arriveTime: '00:00', // 상시 표시를 위한 기본값
-            date: dateStr,
-            type: 'log',
-            itemType: 'log'
-        }));
+        // 영구 지오펜스는 로그에 표시하지 않음 (실제 방문 기록과 일시적 지오펜스만 표시)
+        // 영구 지오펜스가 필요하면 마이페이지에서 관리
 
-        return [...items, ...permanentItems].sort((a, b) => {
+        return items.sort((a, b) => {
             // 정렬 우선순위: 시간 순
             const getTime = (item: CalendarItem) => {
                 if (item.itemType === 'log') return item.arriveTime;
@@ -236,7 +255,7 @@ export const useCalendarData = (todayDateStr: string) => {
             };
             return getTime(a).localeCompare(getTime(b));
         });
-    }, [itemsByDate, permanentGeofences]);
+    }, [itemsByDate]);
 
     return {
         isLoading,

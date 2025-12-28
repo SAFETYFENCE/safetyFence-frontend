@@ -256,7 +256,7 @@ class WebSocketService {
    * @param callback 위치 업데이트 콜백
    */
   subscribeToUserLocation(targetUserNumber: string, callback: LocationCallback): void {
-    if (!this._isConnected) {
+    if (!this.client?.connected) {
       console.warn('WebSocket이 연결되지 않음 - 구독 불가');
       return;
     }
@@ -268,10 +268,6 @@ class WebSocketService {
     }
 
     try {
-      if (!this.client) {
-        console.warn('WebSocket 클라이언트가 없음');
-        return;
-      }
 
       const destination = `/topic/location/${targetUserNumber}`;
 

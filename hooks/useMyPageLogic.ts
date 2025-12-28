@@ -108,9 +108,32 @@ export const useMyPageLogic = () => {
         );
     };
 
-    const handlePasswordChange = async () => {
-        Alert.alert('알림', '추후 추가될 예정입니다.');
-        setIsPasswordModalOpen(false);
+    const handlePasswordChange = async (passwordData: { currentPassword: string; newPassword: string; confirmPassword: string }) => {
+        try {
+            // 유효성 검사
+            if (passwordData.newPassword !== passwordData.confirmPassword) {
+                Alert.alert('알림', '새 비밀번호가 일치하지 않습니다.');
+                return;
+            }
+
+            if (passwordData.newPassword.length < 4) {
+                Alert.alert('알림', '비밀번호는 최소 4자 이상이어야 합니다.');
+                return;
+            }
+
+            // API 호출
+            await userService.changePassword({
+                currentPassword: passwordData.currentPassword,
+                newPassword: passwordData.newPassword,
+            });
+
+            Alert.alert('성공', '비밀번호가 변경되었습니다.');
+            setIsPasswordModalOpen(false);
+        } catch (error: any) {
+            console.error('비밀번호 변경 실패:', error);
+            const message = error.response?.data?.message || '비밀번호 변경에 실패했습니다.';
+            Alert.alert('오류', message);
+        }
     };
 
     return {

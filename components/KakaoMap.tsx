@@ -169,6 +169,7 @@ const HTML_CONTENT = `
     let geofenceCircles = [];
     let geofenceMarkers = [];
     let hasCentered = false;
+    let lastTargetLocation = null;
 
     function initMap() {
       try {
@@ -340,18 +341,23 @@ const HTML_CONTENT = `
         });
       }
 
-      // 초기 센터링: 보호자는 target, 이용자는 current 기준 1회만
-      if (!hasCentered) {
-        const centerSource = userRole === 'supporter'
-          ? targetLocation || currentLocation
-          : currentLocation || targetLocation;
+      // 센터링 로직
+      const centerSource = userRole === 'supporter'
+        ? targetLocation || currentLocation
+        : currentLocation || targetLocation;
 
-        if (centerSource) {
-          const centerPos = new kakao.maps.LatLng(centerSource.latitude, centerSource.longitude);
-          map.setCenter(centerPos);
-          hasCentered = true;
-        }
+      // 초기 센터링 또는 targetLocation이 처음 설정될 때
+      const shouldCenter = !hasCentered ||
+        (userRole === 'supporter' && targetLocation && !lastTargetLocation);
+
+      if (centerSource && shouldCenter) {
+        const centerPos = new kakao.maps.LatLng(centerSource.latitude, centerSource.longitude);
+        map.setCenter(centerPos);
+        hasCentered = true;
       }
+
+      // targetLocation 상태 저장
+      lastTargetLocation = targetLocation;
     }
 
     document.addEventListener('message', function(event) {

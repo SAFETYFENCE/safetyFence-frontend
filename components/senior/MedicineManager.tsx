@@ -1,5 +1,5 @@
 
-import { storage } from '@/utils/storage';
+import { useMedicationManagement } from '@/hooks/useMedicationManagement';
 import { Plus, X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -7,41 +7,45 @@ import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } fro
 interface MedicineManagerProps {
     visible: boolean;
     onClose: () => void;
-    medicineList: string[];
-    onUpdateList: (newList: string[]) => void;
 }
 
-export default function MedicineManager({ visible, onClose, medicineList, onUpdateList }: MedicineManagerProps) {
-    const [newMedicineName, setNewMedicineName] = useState('');
+export default function MedicineManager({ visible, onClose }: MedicineManagerProps) {
+    const [name, setName] = useState('');
+    const [dosage, setDosage] = useState('');
+    const [purpose, setPurpose] = useState('');
+    const [frequency, setFrequency] = useState('');
+
+    const { medications, loading, addMedication, deleteMedication } = useMedicationManagement();
 
     const handleAddMedicine = async () => {
-        if (!newMedicineName.trim()) {
+        if (!name.trim()) {
             Alert.alert('알림', '약 이름을 입력해주세요.');
             return;
         }
 
-        if (medicineList.includes(newMedicineName.trim())) {
-            Alert.alert('알림', '이미 등록된 약입니다.');
-            return;
-        }
+        const success = await addMedication({
+            name: name.trim(),
+            dosage: dosage.trim() || '정보 없음',
+            purpose: purpose.trim() || '정보 없음',
+            frequency: frequency.trim() || '정보 없음',
+        });
 
-        const newList = [...medicineList, newMedicineName.trim()];
-        await storage.setMedicineList(newList);
-        onUpdateList(newList);
-        setNewMedicineName('');
+        if (success) {
+            // 입력 필드 초기화
+            setName('');
+            setDosage('');
+            setPurpose('');
+            setFrequency('');
+        }
     };
 
-    const handleDeleteMedicine = async (nameToDelete: string) => {
-        Alert.alert('삭제 확인', `'${nameToDelete}'을(를) 정말 삭제하시겠습니까?`, [
+    const handleDeleteMedicine = async (medicationId: number, medicationName: string) => {
+        Alert.alert('삭제 확인', `'${medicationName}'을(를) 정말 삭제하시겠습니까?`, [
             { text: '취소', style: 'cancel' },
             {
                 text: '삭제',
                 style: 'destructive',
-                onPress: async () => {
-                    const newList = medicineList.filter(name => name !== nameToDelete);
-                    await storage.setMedicineList(newList);
-                    onUpdateList(newList);
-                }
+                onPress: () => deleteMedication(medicationId)
             }
         ]);
     };
@@ -73,31 +77,73 @@ export default function MedicineManager({ visible, onClose, medicineList, onUpda
                         {/* Input Area */}
                         <View className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-8">
                             <Text className="text-sm font-bold text-gray-600 mb-3 ml-1">새로운 약 추가</Text>
-                            <View className="flex-row items-center">
+
+                            {/* 약 이름 (필수) */}
+                            <View className="mb-3">
+                                <Text className="text-xs font-bold text-gray-500 mb-2 ml-1">약 이름 (필수)</Text>
                                 <TextInput
-                                    className="flex-1 bg-gray-50 px-5 py-4 rounded-xl text-lg border border-gray-200 text-gray-900"
+                                    className="bg-gray-50 px-5 py-4 rounded-xl text-lg border border-gray-200 text-gray-900"
                                     placeholder="예: 혈압약, 당뇨약"
-                                    value={newMedicineName}
-                                    onChangeText={setNewMedicineName}
-                                    returnKeyType="done"
-                                    onSubmitEditing={handleAddMedicine}
+                                    value={name}
+                                    onChangeText={setName}
                                     placeholderTextColor="#9ca3af"
                                 />
-                                <TouchableOpacity
-                                    onPress={handleAddMedicine}
-                                    className="bg-teal-600 w-14 h-[60px] ml-3 items-center justify-center rounded-xl shadow-md active:bg-teal-700"
-                                >
-                                    <Plus size={28} color="white" />
-                                </TouchableOpacity>
                             </View>
+
+                            {/* 용량 (선택) */}
+                            <View className="mb-3">
+                                <Text className="text-xs font-bold text-gray-500 mb-2 ml-1">용량 (선택)</Text>
+                                <TextInput
+                                    className="bg-gray-50 px-5 py-4 rounded-xl text-base border border-gray-200 text-gray-900"
+                                    placeholder="예: 1정, 10mg"
+                                    value={dosage}
+                                    onChangeText={setDosage}
+                                    placeholderTextColor="#9ca3af"
+                                />
+                            </View>
+
+                            {/* 목적 (선택) */}
+                            <View className="mb-3">
+                                <Text className="text-xs font-bold text-gray-500 mb-2 ml-1">복용 목적 (선택)</Text>
+                                <TextInput
+                                    className="bg-gray-50 px-5 py-4 rounded-xl text-base border border-gray-200 text-gray-900"
+                                    placeholder="예: 혈압 조절, 당뇨 관리"
+                                    value={purpose}
+                                    onChangeText={setPurpose}
+                                    placeholderTextColor="#9ca3af"
+                                />
+                            </View>
+
+                            {/* 복용 빈도 (선택) */}
+                            <View className="mb-4">
+                                <Text className="text-xs font-bold text-gray-500 mb-2 ml-1">복용 빈도 (선택)</Text>
+                                <TextInput
+                                    className="bg-gray-50 px-5 py-4 rounded-xl text-base border border-gray-200 text-gray-900"
+                                    placeholder="예: 하루 1회, 아침/저녁 식후"
+                                    value={frequency}
+                                    onChangeText={setFrequency}
+                                    placeholderTextColor="#9ca3af"
+                                />
+                            </View>
+
+                            {/* 추가 버튼 */}
+                            <TouchableOpacity
+                                onPress={handleAddMedicine}
+                                disabled={loading}
+                                className={`bg-teal-600 py-4 rounded-xl items-center justify-center shadow-md ${loading ? 'opacity-50' : 'active:bg-teal-700'}`}
+                            >
+                                <Text className="text-white text-lg font-bold">
+                                    {loading ? '추가 중...' : '약 추가하기'}
+                                </Text>
+                            </TouchableOpacity>
                         </View>
 
                         {/* Medicine List */}
                         <Text className="text-lg font-bold text-gray-900 mb-4 ml-1">
-                            등록된 약 <Text className="text-teal-600">({medicineList.length})</Text>
+                            등록된 약 <Text className="text-teal-600">({medications.length})</Text>
                         </Text>
 
-                        {medicineList.length === 0 ? (
+                        {medications.length === 0 ? (
                             <View className="items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-gray-300">
                                 <View className="w-16 h-16 bg-gray-50 rounded-full items-center justify-center mb-4">
                                     <Plus size={32} color="#d1d5db" />
@@ -106,20 +152,32 @@ export default function MedicineManager({ visible, onClose, medicineList, onUpda
                                 <Text className="text-gray-400 text-sm mt-2">위 입력창에서 약을 추가해보세요.</Text>
                             </View>
                         ) : (
-                            <View className="flex-row flex-wrap gap-3">
-                                {medicineList.map((medicine, index) => (
+                            <View className="gap-3">
+                                {medications.map((medication) => (
                                     <View
-                                        key={index}
-                                        className="bg-white border border-gray-200 pr-3 pl-4 py-3 rounded-full shadow-sm flex-row items-center"
+                                        key={medication.id}
+                                        className="bg-white border border-gray-200 p-4 rounded-2xl shadow-sm"
                                     >
-                                        <View className="w-2 h-2 rounded-full bg-teal-500 mr-3" />
-                                        <Text className="text-lg font-bold text-gray-800 mr-2">{medicine}</Text>
-                                        <TouchableOpacity
-                                            onPress={() => handleDeleteMedicine(medicine)}
-                                            className="p-1.5 bg-red-50 rounded-full ml-1 active:bg-red-100"
-                                        >
-                                            <X size={14} color="#ef4444" />
-                                        </TouchableOpacity>
+                                        <View className="flex-row items-start justify-between mb-2">
+                                            <View className="flex-1">
+                                                <Text className="text-xl font-bold text-gray-900 mb-1">{medication.name}</Text>
+                                                {medication.dosage && medication.dosage !== '정보 없음' && (
+                                                    <Text className="text-sm text-gray-600">용량: {medication.dosage}</Text>
+                                                )}
+                                                {medication.purpose && medication.purpose !== '정보 없음' && (
+                                                    <Text className="text-sm text-gray-600">목적: {medication.purpose}</Text>
+                                                )}
+                                                {medication.frequency && medication.frequency !== '정보 없음' && (
+                                                    <Text className="text-sm text-gray-600">빈도: {medication.frequency}</Text>
+                                                )}
+                                            </View>
+                                            <TouchableOpacity
+                                                onPress={() => handleDeleteMedicine(medication.id, medication.name)}
+                                                className="p-2 bg-red-50 rounded-full active:bg-red-100 ml-2"
+                                            >
+                                                <X size={18} color="#ef4444" />
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
                                 ))}
                             </View>

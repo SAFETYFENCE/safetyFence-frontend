@@ -5,15 +5,58 @@ import { authService } from '@/services/authService';
 import { initializeNotifications } from '@/services/notificationService';
 import { storage } from '@/utils/storage';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 
 export const useLoginLogic = () => {
     const router = useRouter();
-    const { disconnectWebSocket } = useLocation();
+    const { disconnectWebSocket, connectWebSocket } = useLocation();
     const [number, setNumber] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [autoLogin, setAutoLogin] = useState(true);
+    const [isCheckingAutoLogin, setIsCheckingAutoLogin] = useState(true);
+
+    // 앱 시작 시 자동 로그인 확인
+    useEffect(() => {
+        const checkAutoLogin = async () => {
+            try {
+                const [savedAutoLogin, apiKey, userRole] = await Promise.all([
+                    storage.getAutoLogin(),
+                    storage.getApiKey(),
+                    storage.getUserRole(),
+                ]);
+
+                setAutoLogin(savedAutoLogin);
+
+                // 자동 로그인이 활성화되어 있고 로그인 정보가 있으면 자동 로그인
+                if (savedAutoLogin && apiKey) {
+                    console.log('✅ 자동 로그인 시작');
+
+                    if (userRole === 'user') {
+                        // 자동 로그인 시에는 startTracking()을 호출하지 않음
+                        // UserMainPage에서 useEffect로 자동 시작됨
+                        await disconnectWebSocket();
+                        connectWebSocket();
+                        router.replace('/UserMainPage');
+                    } else if (userRole === 'supporter') {
+                        await disconnectWebSocket();
+                        router.replace('/LinkPage');
+                    } else {
+                        // 역할이 없으면 역할 선택 화면으로
+                        router.replace('/SelectRole');
+                    }
+                } else {
+                    setIsCheckingAutoLogin(false);
+                }
+            } catch (error) {
+                console.error('자동 로그인 확인 실패:', error);
+                setIsCheckingAutoLogin(false);
+            }
+        };
+
+        checkAutoLogin();
+    }, []);
 
     const handleLogin = async () => {
         if (!number.trim() || !password.trim()) {
@@ -33,6 +76,7 @@ export const useLoginLogic = () => {
             Global.NUMBER = response.number;
 
             await storage.setLoginInfo(response.apiKey, response.number, response.name);
+            await storage.setAutoLogin(autoLogin); // 자동 로그인 설정 저장
             await initializeNotifications();
             await disconnectWebSocket();
 
@@ -54,8 +98,11 @@ export const useLoginLogic = () => {
         number,
         password,
         isLoading,
+        autoLogin,
+        isCheckingAutoLogin,
         setNumber,
         setPassword,
+        setAutoLogin,
         handleLogin,
         handleSignup
     };

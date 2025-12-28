@@ -1,8 +1,7 @@
 import { UserMedicineData } from '@/hooks/useMedicineData';
-import { CheckCircle2, Sparkles, User as UserIcon } from 'lucide-react-native';
+import { CheckCircle2, Pill, Sparkles, User as UserIcon } from 'lucide-react-native';
 import React from 'react';
 import { Text, View } from 'react-native';
-import MedicineItem from './MedicineItem';
 
 interface UserMedicineCardProps {
     item: UserMedicineData;
@@ -18,7 +17,7 @@ const UserMedicineCard: React.FC<UserMedicineCardProps> = ({ item }) => {
     return (
         <View className="mb-8">
             <View className="flex-row items-end mb-4 px-1">
-                <Text className="text-xl font-extrabold text-slate-800 mr-2">{item.user.relation}</Text>
+                <Text className="text-xl font-extrabold text-slate-800 mr-2">{item.user.userName}</Text>
                 <Text className="text-sm font-medium text-slate-400 mb-1">님의 복용 일정</Text>
             </View>
 
@@ -36,11 +35,13 @@ const UserMedicineCard: React.FC<UserMedicineCardProps> = ({ item }) => {
                     </View>
 
                     {/* Status Badge */}
-                    <View className={`px-3 py-1.5 rounded-full flex-row items-center ${item.medicines.length > 0 ? 'bg-teal-50' : 'bg-slate-50'}`}>
-                        {item.medicines.length > 0 ? (
+                    <View className={`px-3 py-1.5 rounded-full flex-row items-center ${item.totalMedications > 0 ? 'bg-teal-50' : 'bg-slate-50'}`}>
+                        {item.totalMedications > 0 ? (
                             <>
                                 <Sparkles size={12} color={THEME.primary} />
-                                <Text className="text-teal-700 font-bold text-xs ml-1">오늘 {item.medicines.length}회</Text>
+                                <Text className="text-teal-700 font-bold text-xs ml-1">
+                                    {item.checkedMedications}/{item.totalMedications} 복용
+                                </Text>
                             </>
                         ) : (
                             <Text className="text-slate-500 font-bold text-xs">일정 없음</Text>
@@ -54,14 +55,35 @@ const UserMedicineCard: React.FC<UserMedicineCardProps> = ({ item }) => {
                         <Text className="text-red-500 font-medium">일정을 불러올 수 없어요</Text>
                     </View>
                 ) : item.medicines.length > 0 ? (
-                    <View className="pl-2">
-                        {item.medicines.map((medicine, index) => (
-                            <MedicineItem
-                                key={medicine.userEventId}
-                                item={medicine}
-                                index={index}
-                                total={item.medicines.length}
-                            />
+                    <View className="gap-3">
+                        {item.medicines.map((medicine) => (
+                            <View
+                                key={medicine.id}
+                                className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex-row items-center"
+                            >
+                                <View className="h-12 w-12 rounded-full bg-teal-50 items-center justify-center mr-4">
+                                    <Pill size={20} color={THEME.primary} />
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="text-gray-900 font-bold text-lg mb-1">{medicine.name}</Text>
+                                    {medicine.dosage && medicine.dosage !== '정보 없음' && (
+                                        <Text className="text-slate-500 text-sm">용량: {medicine.dosage}</Text>
+                                    )}
+                                    {medicine.purpose && medicine.purpose !== '정보 없음' && (
+                                        <Text className="text-slate-500 text-sm">목적: {medicine.purpose}</Text>
+                                    )}
+                                </View>
+                                {medicine.checkedToday && (
+                                    <View className="bg-teal-600 px-3 py-1.5 rounded-lg">
+                                        <Text className="text-white text-xs font-bold">복용완료</Text>
+                                    </View>
+                                )}
+                                {!medicine.checkedToday && (
+                                    <View className="bg-slate-200 px-3 py-1.5 rounded-lg">
+                                        <Text className="text-slate-600 text-xs font-bold">미복용</Text>
+                                    </View>
+                                )}
+                            </View>
                         ))}
                     </View>
                 ) : (

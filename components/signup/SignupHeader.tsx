@@ -8,7 +8,7 @@ const SignupHeader: React.FC = () => {
     const router = useRouter();
 
     return (
-        <View className="bg-green-500 px-6 pt-6 pb-10 rounded-b-[30px] shadow-sm mb-6">
+        <View className="bg-green-500 px-6 pt-16 pb-10 rounded-b-[30px] shadow-sm mb-6">
             <View className="flex-row items-center justify-center relative mb-2">
                 <TouchableOpacity
                     onPress={() => router.back()}
