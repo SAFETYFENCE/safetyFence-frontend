@@ -1,4 +1,3 @@
-
 import { Clock, MapPin } from 'lucide-react-native';
 import React from 'react';
 import { Text, View } from 'react-native';
@@ -9,7 +8,7 @@ interface Props {
 }
 
 const ScheduleCard: React.FC<Props> = React.memo(({ schedule }) => (
-    <View className="bg-white rounded-xl shadow p-4 mb-3 border border-gray-100">
+    <View className="bg-white rounded-xl shadow p-4 mb-3 border-l-4 border-green-500">
         <View className="flex-row items-start">
             <View className="h-11 w-11 bg-green-50 rounded-lg items-center justify-center mr-3">
                 <MapPin size={20} color="#25eb5aff" />

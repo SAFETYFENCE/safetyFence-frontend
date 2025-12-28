@@ -1,4 +1,3 @@
-
 import { Clock, MapPin } from 'lucide-react-native';
 import React from 'react';
 import { Text, View } from 'react-native';
@@ -9,10 +8,10 @@ interface Props {
 }
 
 const LogCard: React.FC<Props> = React.memo(({ log }) => (
-    <View className="bg-white rounded-xl shadow p-4 mb-3 border border-gray-100">
+    <View className="bg-white rounded-xl shadow p-4 mb-3 border-l-4 border-orange-500">
         <View className="flex-row items-start">
-            <View className="h-11 w-11 bg-blue-50 rounded-lg items-center justify-center mr-3">
-                <MapPin size={20} color="#3B82F6" />
+            <View className="h-11 w-11 bg-orange-50 rounded-lg items-center justify-center mr-3">
+                <MapPin size={20} color="#f97316" />
             </View>
             <View className="flex-1">
                 <Text className="text-base font-bold text-gray-900 mb-1">{log.location}</Text>
@@ -23,8 +22,8 @@ const LogCard: React.FC<Props> = React.memo(({ log }) => (
                     </Text>
                 </View>
                 <Text className="text-sm text-gray-500 mb-3">{log.address}</Text>
-                <View className="self-start px-2.5 py-1 rounded-full bg-blue-100">
-                    <Text className="text-xs font-semibold text-blue-700">
+                <View className="self-start px-2.5 py-1 rounded-full bg-orange-100">
+                    <Text className="text-xs font-semibold text-orange-700">
                         과거 로그
                     </Text>
                 </View>
@@ -34,4 +33,3 @@ const LogCard: React.FC<Props> = React.memo(({ log }) => (
 ));
 
 export default LogCard;
-//
