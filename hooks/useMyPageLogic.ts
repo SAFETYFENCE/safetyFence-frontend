@@ -4,12 +4,12 @@ import { geofenceService } from '@/services/geofenceService';
 import { userService } from '@/services/userService';
 import { MyPageData } from '@/types/api';
 import { storage } from '@/utils/storage';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 
 export const useMyPageLogic = () => {
-    const navigation = useNavigation();
+    const router = useRouter();
     const [userData, setUserData] = useState<MyPageData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -69,7 +69,7 @@ export const useMyPageLogic = () => {
                             Global.NUMBER = "";
                             Global.TARGET_NUMBER = "";
                             Global.USER_ROLE = "";
-                            navigation.navigate('index' as never);
+                            router.replace('/');  // push → replace로 변경하여 스택 정리
                         } catch (error) {
                             console.error('로그아웃 실패:', error);
                             Alert.alert('오류', '로그아웃 처리 중 문제가 발생했습니다.');

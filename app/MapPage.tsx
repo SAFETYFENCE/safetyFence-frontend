@@ -78,7 +78,7 @@ const MainPage: React.FC = () => {
 
   const headerText = userRole === 'user'
     ? '내 위치'
-    : Global.TARGET_NUMBER ? `${label}의 위치` : '이용자 위치';
+    : Global.TARGET_NUMBER ? `${label}님의 위치` : '이용자 위치';
 
   const baseHeaderSubText = userRole === 'user'
     ? (isTracking
@@ -87,10 +87,10 @@ const MainPage: React.FC = () => {
     : (!Global.TARGET_NUMBER
       ? '추적할 이용자를 선택해주세요.'
       : !isWebSocketConnected
-        ? `${label}의 위치 정보를 받지 못하고 있습니다.`
+        ? `${label}님의 위치 정보를 받지 못하고 있습니다.`
         : targetLocation
-          ? `${label}의 위치를 지도에 표시하고 있습니다.`
-          : `${label}의 위치 데이터를 수신하는 중입니다...`);
+          ? `${label}님의 위치를 지도에 표시하고 있습니다.`
+          : `${label}님의 위치 데이터를 수신하는 중입니다...`);
 
   const freshness = getLocationFreshnessMessage();
   const headerSubText = freshness ? `${baseHeaderSubText}\n${freshness}` : baseHeaderSubText;

@@ -1,7 +1,7 @@
 import Global from '@/constants/Global';
 import { useLocation } from '@/contexts/LocationContext';
 import { Ionicons } from '@expo/vector-icons';
-import { NavigationProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
   Activity,
   Calendar as CalendarIcon,
@@ -29,27 +29,23 @@ import {
 import BottomNavigation from '../components/BottomNavigation';
 import CustomDatePicker from '../components/common/CustomDatePicker';
 import GeofenceModal, { GeofenceData } from '../components/GeofenceModal';
+import BatchSuccessModal from '../components/link/BatchSuccessModal';
 import { calendarService } from '../services/calendarService';
 import { geofenceService } from '../services/geofenceService';
 import { linkService } from '../services/linkService';
 import { medicationService } from '../services/medicationService';
+import { notifyMedicationAdded, notifyEventAdded } from '../services/notificationService';
 
 interface UserItem {
   id: number;
   userNumber: string;
   relation: string;
+  batteryLevel: number | null;
+  batteryLastUpdate: number | null;
 }
 
-type RootStackParamList = {
-  MapPage: undefined;
-  LinkPage: undefined;
-  LogPage: undefined;
-  MyPage: undefined;
-};
-
 const UsersScreen: React.FC = () => {
-  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const route = useRoute();
+  const router = useRouter();
   const { setSupporterTarget } = useLocation();
   const [users, setUsers] = useState<UserItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -84,6 +80,22 @@ const UsersScreen: React.FC = () => {
   // Location Batch State
   const [isGeofenceModalOpen, setIsGeofenceModalOpen] = useState(false);
   const [batchGeofenceData, setBatchGeofenceData] = useState<GeofenceData | null>(null);
+
+  // Success Modal State
+  const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
+  const [successModalData, setSuccessModalData] = useState<{
+    type: 'schedule' | 'medicine' | 'location';
+    itemName: string;
+    totalCount: number;
+    successCount: number;
+    failCount: number;
+  }>({
+    type: 'schedule',
+    itemName: '',
+    totalCount: 0,
+    successCount: 0,
+    failCount: 0,
+  });
 
   const syncSelectedUserState = useCallback((list: UserItem[]) => {
     if (Global.TARGET_NUMBER) {
@@ -168,7 +180,7 @@ const UsersScreen: React.FC = () => {
     Global.TARGET_NUMBER = userNumber;
     setSelectedUserNumber(userNumber);
     setSupporterTarget(userNumber);
-    navigation.navigate('MapPage');
+    router.push('/MapPage');
   };
 
   const handleRemoveUser = (userNumber: string) => {
@@ -257,6 +269,9 @@ const UsersScreen: React.FC = () => {
               eventDate: batchEventDate,
               startTime: batchEventTime
             }, userNumber);
+
+            // 알림 전송
+            await notifyEventAdded(userNumber, batchEventTitle, batchEventDate, batchEventTime);
           } else if (activeBatchTab === 'medicine') {
             // Use medicationService as per original logic
             await medicationService.create({
@@ -265,6 +280,9 @@ const UsersScreen: React.FC = () => {
               purpose: batchMedicinePurpose || '정보 없음',
               frequency: batchMedicineFrequency || '정보 없음',
             }, userNumber);
+
+            // 알림 전송
+            await notifyMedicationAdded(userNumber, batchMedicineName);
           } else if (activeBatchTab === 'location' && batchGeofenceData) {
             const formatTime = (date?: Date) => {
               if (!date) return null;
@@ -288,29 +306,27 @@ const UsersScreen: React.FC = () => {
         }
       }
 
-      Alert.alert(
-        '완료',
-        `총 ${selectedUsers.length}명 중\n성공: ${successCount}명\n실패: ${failCount}명`,
-        [{
-          text: '확인', onPress: () => {
-            setIsBatchModalOpen(false);
-            // Reset Fields
-            setBatchEventTitle('');
-            setBatchEventDate('');
-            setBatchEventTime('');
-            setBatchMedicineName('');
-            setBatchMedicineDosage('');
-            setBatchMedicinePurpose('');
-            setBatchMedicineFrequency('');
-            setBatchGeofenceData(null);
+      // 아이템 이름 추출
+      let itemName = '';
+      if (activeBatchTab === 'schedule') {
+        itemName = batchEventTitle;
+      } else if (activeBatchTab === 'medicine') {
+        itemName = batchMedicineName;
+      } else if (activeBatchTab === 'location' && batchGeofenceData) {
+        itemName = batchGeofenceData.name;
+      }
 
-            setIsSelectionMode(false);
-            setSelectedUsers([]);
-            setShowBatchDatePicker(false);
-            setShowBatchTimePicker(false);
-          }
-        }]
-      );
+      // 성공 모달 데이터 설정
+      setSuccessModalData({
+        type: activeBatchTab,
+        itemName,
+        totalCount: selectedUsers.length,
+        successCount,
+        failCount,
+      });
+
+      // 모달 표시
+      setIsSuccessModalVisible(true);
 
     } catch (error) {
       console.error('일괄 등록 중 오류:', error);
@@ -396,9 +412,25 @@ const UsersScreen: React.FC = () => {
                 {/* Battery Badge */}
                 <View className={`flex-row items-center px-2 py-0.5 rounded-full ${isSelected ? 'bg-white/60' : 'bg-gray-100'
                   }`}>
-                  <Ionicons name="battery-half" size={12} color={isSelected ? "#15803d" : "#6b7280"} />
-                  <Text className={`text-xs font-bold ml-1 ${isSelected ? 'text-green-700' : 'text-gray-600'}`}>
-                    78%
+                  <Ionicons
+                    name={
+                      user.batteryLevel === null ? "battery-dead" :
+                      user.batteryLevel >= 80 ? "battery-full" :
+                      user.batteryLevel >= 50 ? "battery-half" :
+                      user.batteryLevel >= 20 ? "battery-half" :
+                      "battery-dead"
+                    }
+                    size={12}
+                    color={
+                      user.batteryLevel === null ? "#9ca3af" :
+                      user.batteryLevel >= 20 ? (isSelected ? "#15803d" : "#6b7280") : "#ef4444"
+                    }
+                  />
+                  <Text className={`text-xs font-bold ml-1 ${
+                    user.batteryLevel === null ? 'text-gray-400' :
+                    user.batteryLevel >= 20 ? (isSelected ? 'text-green-700' : 'text-gray-600') : 'text-red-600'
+                  }`}>
+                    {user.batteryLevel !== null ? `${user.batteryLevel}%` : 'N/A'}
                   </Text>
                 </View>
                 <Text className="text-xs text-gray-400 font-medium tracking-wide">
@@ -889,6 +921,34 @@ const UsersScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Batch Success Modal */}
+      <BatchSuccessModal
+        visible={isSuccessModalVisible}
+        type={successModalData.type}
+        itemName={successModalData.itemName}
+        totalCount={successModalData.totalCount}
+        successCount={successModalData.successCount}
+        failCount={successModalData.failCount}
+        onConfirm={() => {
+          setIsBatchModalOpen(false);
+          // Reset Fields
+          setBatchEventTitle('');
+          setBatchEventDate('');
+          setBatchEventTime('');
+          setBatchMedicineName('');
+          setBatchMedicineDosage('');
+          setBatchMedicinePurpose('');
+          setBatchMedicineFrequency('');
+          setBatchGeofenceData(null);
+
+          setIsSelectionMode(false);
+          setSelectedUsers([]);
+          setShowBatchDatePicker(false);
+          setShowBatchTimePicker(false);
+          setIsSuccessModalVisible(false);
+        }}
+      />
     </SafeAreaView >
   );
 };

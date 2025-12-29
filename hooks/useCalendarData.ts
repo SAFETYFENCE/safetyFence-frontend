@@ -5,6 +5,7 @@ import Global from '../constants/Global';
 import { calendarService } from '../services/calendarService';
 import { geofenceService } from '../services/geofenceService';
 import { medicationService } from '../services/medicationService';
+import { notifyEventAdded } from '../services/notificationService';
 import { GeofenceItem } from '../types/api';
 import { CalendarItem, Log, MedicineLog, Schedule, Todo } from '../types/calendar';
 
@@ -165,11 +166,18 @@ export const useCalendarData = (todayDateStr: string) => {
                 ? Global.TARGET_NUMBER
                 : undefined;
 
+            const eventTime = `${data.time.getHours().toString().padStart(2, '0')}:${data.time.getMinutes().toString().padStart(2, '0')}`;
+
             await calendarService.addEvent({
                 event: data.title,
                 eventDate: selectedDate,
-                startTime: `${data.time.getHours().toString().padStart(2, '0')}:${data.time.getMinutes().toString().padStart(2, '0')}`,
+                startTime: eventTime,
             }, targetNumber);
+
+            // 보호자가 피보호자의 일정을 추가한 경우 알림 전송
+            if (targetNumber) {
+                await notifyEventAdded(targetNumber, data.title, selectedDate, eventTime);
+            }
 
             // 데이터 새로고침
             await loadCalendarData();

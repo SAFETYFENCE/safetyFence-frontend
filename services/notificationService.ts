@@ -159,6 +159,54 @@ export const unregisterTokenFromServer = async (token: string): Promise<boolean>
 };
 
 /**
+ * 약 추가 알림 전송 (보호자가 피보호자의 약을 추가했을 때)
+ * POST /notification/medication-added
+ */
+export const notifyMedicationAdded = async (
+  targetUserNumber: string,
+  medicationName: string
+): Promise<void> => {
+  try {
+    const body = {
+      targetUserNumber,
+      medicationName,
+    };
+
+    await apiClient.post('/notification/medication-added', body);
+    console.log(`✅ 약 추가 알림 전송 성공: ${medicationName} → ${targetUserNumber}`);
+  } catch (error) {
+    console.error('❌ 약 추가 알림 전송 실패:', error);
+    // 알림 실패는 주요 작업(약 추가)을 중단시키지 않음
+  }
+};
+
+/**
+ * 이벤트 추가 알림 전송 (보호자가 피보호자의 일정을 추가했을 때)
+ * POST /notification/event-added
+ */
+export const notifyEventAdded = async (
+  targetUserNumber: string,
+  eventTitle: string,
+  eventDate: string,
+  eventTime: string
+): Promise<void> => {
+  try {
+    const body = {
+      targetUserNumber,
+      eventTitle,
+      eventDate,
+      eventTime,
+    };
+
+    await apiClient.post('/notification/event-added', body);
+    console.log(`✅ 이벤트 추가 알림 전송 성공: ${eventTitle} → ${targetUserNumber}`);
+  } catch (error) {
+    console.error('❌ 이벤트 추가 알림 전송 실패:', error);
+    // 알림 실패는 주요 작업(이벤트 추가)을 중단시키지 않음
+  }
+};
+
+/**
  * 알림 초기화 (앱 시작 시 호출)
  */
 export const initializeNotifications = async (): Promise<void> => {

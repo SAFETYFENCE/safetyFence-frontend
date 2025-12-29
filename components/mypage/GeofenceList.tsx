@@ -36,7 +36,7 @@ const GeofenceList: React.FC<Props> = ({ geofences, onDelete }) => {
                     </View>
                     <Text className="text-lg font-bold text-gray-900">
                         {Global.USER_ROLE === 'supporter' && Global.TARGET_NUMBER
-                            ? `${Global.TARGET_RELATION || Global.TARGET_NUMBER}의 영역`
+                            ? `${Global.TARGET_RELATION || Global.TARGET_NUMBER}님의 영역`
                             : '등록된 영역'}
                     </Text>
                 </View>

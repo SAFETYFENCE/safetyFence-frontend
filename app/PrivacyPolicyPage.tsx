@@ -1,10 +1,10 @@
 import React from 'react';
 import { SafeAreaView, ScrollView, Text, View, TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 
 const PrivacyPolicyPage: React.FC = () => {
-  const navigation = useNavigation();
+  const router = useRouter();
 
   // 표의 헤더와 행을 그리는 헬퍼 컴포넌트
   const TableRow = ({ col1, col2, col3, col4, isHeader = false }: any) => (
@@ -28,7 +28,7 @@ const PrivacyPolicyPage: React.FC = () => {
     <SafeAreaView className="flex-1 bg-white pt-safe">
       {/* 헤더 영역 */}
       {/* <View className="flex-row items-center justify-between p-4 border-b border-gray-200">
-        <TouchableOpacity onPress={() => navigation.goBack()} className="p-2">
+        <TouchableOpacity onPress={() => router.back()} className="p-2">
           <ChevronLeft size={24} color="#1F2937" />
         </TouchableOpacity>
         <Text className="text-lg font-semibold text-gray-800">개인정보 처리방침</Text>

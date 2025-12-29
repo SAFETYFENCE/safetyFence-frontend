@@ -1,7 +1,7 @@
 
 import Global from '@/constants/Global';
 import { userService } from '@/services/userService';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,7 +24,7 @@ import SupporterListModal from '../components/mypage/SupporterListModal';
 import { useMyPageLogic } from '../hooks/useMyPageLogic';
 
 const MyPage: React.FC = () => {
-  const navigation = useNavigation();
+  const router = useRouter();
   const [isSupporterModalOpen, setIsSupporterModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
@@ -95,7 +95,7 @@ const MyPage: React.FC = () => {
           <Text className="text-white font-bold">다시 시도</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          onPress={() => router.back()}
           className="mt-3 bg-gray-100 px-6 py-3 rounded-2xl"
         >
           <Text className="text-gray-600">이전 화면으로</Text>
@@ -118,7 +118,7 @@ const MyPage: React.FC = () => {
 
         <MyPageHeader
           name={userData.name}
-          onBack={Global.USER_ROLE === 'user' ? () => navigation.goBack() : undefined}
+          onBack={Global.USER_ROLE === 'user' ? () => router.back() : undefined}
         />
 
         <View className="px-5">
@@ -146,7 +146,7 @@ const MyPage: React.FC = () => {
               setAddressType('center');
               setAddressModalVisible(true);
             }}
-            onPrivacyPolicy={() => navigation.navigate('PrivacyPolicyPage' as never)}
+            onPrivacyPolicy={() => router.push('/PrivacyPolicyPage')}
             onLogout={handleLogout}
           />
 

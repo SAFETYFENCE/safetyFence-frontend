@@ -134,7 +134,7 @@ const CalendarPage: React.FC = () => {
           )}
           <Text className="text-3xl font-bold text-gray-900">
             {Global.USER_ROLE === 'supporter' && Global.TARGET_NUMBER
-              ? `${(Global.TARGET_RELATION || Global.TARGET_NUMBER)}의 일정`
+              ? `${(Global.TARGET_RELATION || Global.TARGET_NUMBER)}님의 일정`
               : '일정'}
           </Text>
         </View>

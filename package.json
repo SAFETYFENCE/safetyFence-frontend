@@ -23,6 +23,7 @@
     "@stomp/stompjs": "^7.2.1",
     "axios": "^1.10.0",
     "expo": "~54.0.25",
+    "expo-battery": "~10.0.8",
     "expo-blur": "~15.0.7",
     "expo-build-properties": "~1.0.9",
     "expo-clipboard": "~8.0.7",

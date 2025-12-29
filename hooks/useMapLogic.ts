@@ -42,8 +42,7 @@ export const useMapLogic = () => {
         if (role === 'user' || role === 'supporter') {
             setUserRole(role);
             console.log('📍 MapPage - 사용자 역할:', role);
-            // 역할 설정 직후 지오펜스 로드
-            loadGeofences();
+            // 지오펜스 로드는 useFocusEffect에서 처리
         }
     }, []);
 
@@ -55,12 +54,16 @@ export const useMapLogic = () => {
             }
 
             const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-                // 백그라운드 작동 앱이므로 뒤로가기 시 앱 종료 방지 ? (기존 로직 유지)
-                return true;
+                // 사용자 역할: 뒤로가기 허용 (UI 버튼과 일관성)
+                if (userRole === 'user') {
+                    return false;  // 뒤로가기 허용
+                }
+                // 보호자 역할: 계속 막음 (UI에도 버튼 없음)
+                return true;  // 뒤로가기 차단
             });
 
             return () => backHandler.remove();
-        }, [userRole, loadGeofences])
+        }, [userRole]) // loadGeofences는 안정적인 함수이므로 의존성에서 제거
     );
 
     // 주기적 지오펜스 동기화 (30초)
@@ -71,7 +74,7 @@ export const useMapLogic = () => {
             loadGeofences();
         }, 30000);
         return () => clearInterval(syncInterval);
-    }, [userRole, loadGeofences]);
+    }, [userRole]); // loadGeofences는 안정적인 함수이므로 의존성에서 제거
 
     // 지오펜스 저장
     const handleGeofenceSave = async (data: {

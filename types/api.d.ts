@@ -40,6 +40,8 @@ export interface LinkItem {
   id: number;
   userNumber: string;
   relation: string;
+  batteryLevel: number | null;
+  batteryLastUpdate: number | null; // Unix timestamp (milliseconds)
 }
 
 export interface AddLinkRequest {
@@ -247,6 +249,20 @@ export interface ErrorResponse {
   status: string;
   message: string;
   code?: string;
+}
+
+// ==================== 피보호자 알림 ====================
+
+export interface MedicationAddedNotificationRequest {
+  targetUserNumber: string;
+  medicationName: string;
+}
+
+export interface EventAddedNotificationRequest {
+  targetUserNumber: string;
+  eventTitle: string;
+  eventDate: string; // "yyyy-MM-dd"
+  eventTime: string; // "HH:mm"
 }
 
 // ==================== WebSocket (참고용, Phase 1에서는 미사용) ====================

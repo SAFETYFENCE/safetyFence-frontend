@@ -1,5 +1,3 @@
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
 import { Bell, Clock, MapPin } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
@@ -14,18 +12,7 @@ import BottomNavigation from '../components/BottomNavigation';
 import { logService } from '../services/logService';
 import type { LogItem } from '../types/api';
 
-// 라우트 파라미터 타입 정의
-type RootStackParamList = {
-  MapPage: undefined;
-  LinkPage: undefined;
-  LogPage: undefined;
-};
-
-// navigation 타입 명시
-type NavigationProp = StackNavigationProp<RootStackParamList, 'LogPage'>;
-
 const NotificationsPage: React.FC = () => {
-  const navigation = useNavigation<NavigationProp>();
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 

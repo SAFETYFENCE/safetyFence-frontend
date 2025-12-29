@@ -1,4 +1,4 @@
-import { Clock, X } from 'lucide-react-native';
+import { X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   Alert,
@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import CustomDatePicker from './common/CustomDatePicker';
+import SeniorTimePicker from './common/SeniorTimePicker';
 
 interface TodoData {
   title: string;
@@ -35,13 +35,17 @@ const TodoModal: React.FC<TodoModalProps> = ({
     title: '',
     description: '',
   });
-  const [selectedTime, setSelectedTime] = useState(new Date(new Date().setHours(9, 0, 0, 0)));
-  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [selectedTime, setSelectedTime] = useState(() => {
+    const date = new Date();
+    date.setHours(9, 0, 0, 0);
+    return date;
+  });
 
   const handleClose = () => {
     setFormData({ title: '', description: '' });
-    setSelectedTime(new Date(new Date().setHours(9, 0, 0, 0)));
-    setShowTimePicker(false);
+    const resetTime = new Date();
+    resetTime.setHours(9, 0, 0, 0);
+    setSelectedTime(resetTime);
     onClose();
   };
 
@@ -62,12 +66,6 @@ const TodoModal: React.FC<TodoModalProps> = ({
     handleClose();
   };
 
-  const handleTimeChange = (event: any, date?: Date) => {
-    setShowTimePicker(false);
-    if (date) {
-      setSelectedTime(date);
-    }
-  };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -111,26 +109,11 @@ const TodoModal: React.FC<TodoModalProps> = ({
             </View>
 
             <View className="mb-5">
-              <Text className="text-sm font-medium text-gray-700 mb-2">시간</Text>
-              <TouchableOpacity
-                className="flex-row items-center border border-gray-300 rounded-lg px-4 py-3"
-                onPress={() => setShowTimePicker(true)}
-              >
-                <Clock size={20} color="#6b7280" />
-                <Text className="ml-3 text-base text-gray-900">
-                  {selectedTime.getHours().toString().padStart(2, '0')}:{selectedTime.getMinutes().toString().padStart(2, '0')}
-                </Text>
-              </TouchableOpacity>
-
-              {showTimePicker && (
-                <CustomDatePicker
-                  visible={true}
-                  value={selectedTime}
-                  mode="time"
-                  onChange={handleTimeChange}
-                  onClose={() => setShowTimePicker(false)}
-                />
-              )}
+              <Text className="text-base font-bold text-gray-800 mb-3">시간</Text>
+              <SeniorTimePicker
+                value={selectedTime}
+                onChange={setSelectedTime}
+              />
             </View>
 
             <View className="mb-5">

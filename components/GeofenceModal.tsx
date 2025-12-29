@@ -1,6 +1,6 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Location from 'expo-location';
-import { Calendar, ChevronDown, ChevronUp, Clock, MapPin } from 'lucide-react-native';
+import { Calendar, MapPin } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   Alert,
@@ -13,6 +13,7 @@ import {
   View
 } from 'react-native';
 import DaumPostcode, { DaumPostcodeData } from '../utils/DaumPostcode';
+import SeniorTimePicker from './common/SeniorTimePicker';
 
 export interface GeofenceData {
   name: string;
@@ -45,8 +46,6 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
     type: 'permanent',
   });
 
-  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
   const [detailAddress, setDetailAddress] = useState('');
 
@@ -54,10 +53,17 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
   const [endDate, setEndDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState<'start' | 'end' | null>(null);
 
-  const [startHours, setStartHours] = useState('09');
-  const [startMinutes, setStartMinutes] = useState('00');
-  const [endHours, setEndHours] = useState('18');
-  const [endMinutes, setEndMinutes] = useState('00');
+  // 시간 설정 (기본값: 오전 9시, 오후 6시)
+  const [startTime, setStartTime] = useState(() => {
+    const date = new Date();
+    date.setHours(9, 0, 0, 0);
+    return date;
+  });
+  const [endTime, setEndTime] = useState(() => {
+    const date = new Date();
+    date.setHours(18, 0, 0, 0);
+    return date;
+  });
 
   const onDateChange = (event: any, selectedDate?: Date) => {
     const currentDate = selectedDate || (showDatePicker === 'start' ? startDate : endDate);
@@ -89,92 +95,32 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
       ? `${formData.address} ${detailAddress}`
       : formData.address;
 
-    const startTime = new Date(
+    // 날짜 + 시간 결합
+    const finalStartTime = new Date(
       startDate.getFullYear(),
       startDate.getMonth(),
       startDate.getDate(),
-      parseInt(startHours),
-      parseInt(startMinutes)
+      startTime.getHours(),
+      startTime.getMinutes()
     );
 
-    const endTime = new Date(
+    const finalEndTime = new Date(
       endDate.getFullYear(),
       endDate.getMonth(),
       endDate.getDate(),
-      parseInt(endHours),
-      parseInt(endMinutes)
+      endTime.getHours(),
+      endTime.getMinutes()
     );
 
     onSave({
       ...formData,
       address: fullAddress,
-      startTime: formData.type === 'temporary' ? startTime : undefined,
-      endTime: formData.type === 'temporary' ? endTime : undefined,
+      startTime: formData.type === 'temporary' ? finalStartTime : undefined,
+      endTime: formData.type === 'temporary' ? finalEndTime : undefined,
     });
     onClose();
   };
 
-  const adjustTime = (
-    type: 'start' | 'end',
-    unit: 'hours' | 'minutes',
-    increment: number
-  ) => {
-    if (type === 'start') {
-      if (unit === 'hours') {
-        const current = parseInt(startHours);
-        let newValue = current + increment;
-        if (newValue < 0) newValue = 23;
-        if (newValue > 23) newValue = 0;
-        setStartHours(newValue.toString().padStart(2, '0'));
-      } else {
-        const current = parseInt(startMinutes);
-        let newValue = current + increment;
-        if (newValue < 0) newValue = 55;
-        if (newValue > 59) newValue = 0;
-        setStartMinutes(newValue.toString().padStart(2, '0'));
-      }
-    } else {
-      if (unit === 'hours') {
-        const current = parseInt(endHours);
-        let newValue = current + increment;
-        if (newValue < 0) newValue = 23;
-        if (newValue > 23) newValue = 0;
-        setEndHours(newValue.toString().padStart(2, '0'));
-      } else {
-        const current = parseInt(endMinutes);
-        let newValue = current + increment;
-        if (newValue < 0) newValue = 55;
-        if (newValue > 59) newValue = 0;
-        setEndMinutes(newValue.toString().padStart(2, '0'));
-      }
-    }
-  };
-
-  const handleTimeInput = (
-    type: 'start' | 'end',
-    unit: 'hours' | 'minutes',
-    text: string
-  ) => {
-    const num = text.replace(/[^0-9]/g, '');
-    if (num === '') {
-      if (type === 'start') {
-        unit === 'hours' ? setStartHours('00') : setStartMinutes('00');
-      } else {
-        unit === 'hours' ? setEndHours('00') : setEndMinutes('00');
-      }
-    } else {
-      const value = parseInt(num);
-      const maxValue = unit === 'hours' ? 23 : 59;
-      if (value >= 0 && value <= maxValue) {
-        const formatted = value.toString().padStart(2, '0');
-        if (type === 'start') {
-          unit === 'hours' ? setStartHours(formatted) : setStartMinutes(formatted);
-        } else {
-          unit === 'hours' ? setEndHours(formatted) : setEndMinutes(formatted);
-        }
-      }
-    }
-  };
 
   const handleAddressSelect = async (data: DaumPostcodeData) => {
     try {
@@ -201,85 +147,6 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
       Alert.alert('오류', '주소를 좌표로 변환하는 데 실패했습니다.');
     }
   };
-
-  const openTimePicker = (type: 'start' | 'end') => {
-    if (type === 'start') {
-      if (!formData.startTime) {
-        const newTime = new Date();
-        newTime.setHours(parseInt(startHours));
-        newTime.setMinutes(parseInt(startMinutes));
-        setFormData(prev => ({ ...prev, startTime: newTime }));
-      }
-      setShowStartTimePicker(true);
-    } else {
-      if (!formData.endTime) {
-        const newTime = new Date();
-        newTime.setHours(parseInt(endHours));
-        newTime.setMinutes(parseInt(endMinutes));
-        setFormData(prev => ({ ...prev, endTime: newTime }));
-      }
-      setShowEndTimePicker(true);
-    }
-  };
-
-  const TimePickerUI = ({
-    type,
-    hours,
-    minutes,
-    onClose
-  }: {
-    type: 'start' | 'end';
-    hours: string;
-    minutes: string;
-    onClose: () => void;
-  }) => (
-    <View className="border border-gray-300 rounded-lg p-4">
-      <View className="flex-row justify-center items-center">
-        {/* 시간 선택 */}
-        <View className="items-center">
-          <TouchableOpacity onPress={() => adjustTime(type, 'hours', 1)} className="p-2">
-            <ChevronUp size={24} color="#6b7280" />
-          </TouchableOpacity>
-          <TextInput
-            className="border border-gray-300 rounded-lg w-16 h-12 text-center text-xl font-medium text-gray-900"
-            value={hours}
-            onChangeText={(text) => handleTimeInput(type, 'hours', text)}
-            keyboardType="number-pad"
-            maxLength={2}
-          />
-          <TouchableOpacity onPress={() => adjustTime(type, 'hours', -1)} className="p-2">
-            <ChevronDown size={24} color="#6b7280" />
-          </TouchableOpacity>
-        </View>
-
-        <Text className="text-2xl font-medium text-gray-900 mx-3">:</Text>
-
-        {/* 분 선택 */}
-        <View className="items-center">
-          <TouchableOpacity onPress={() => adjustTime(type, 'minutes', 5)} className="p-2">
-            <ChevronUp size={24} color="#6b7280" />
-          </TouchableOpacity>
-          <TextInput
-            className="border border-gray-300 rounded-lg w-16 h-12 text-center text-xl font-medium text-gray-900"
-            value={minutes}
-            onChangeText={(text) => handleTimeInput(type, 'minutes', text)}
-            keyboardType="number-pad"
-            maxLength={2}
-          />
-          <TouchableOpacity onPress={() => adjustTime(type, 'minutes', -5)} className="p-2">
-            <ChevronDown size={24} color="#6b7280" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <TouchableOpacity
-        className="bg-gray-100 py-2 rounded-lg mt-3"
-        onPress={onClose}
-      >
-        <Text className="text-gray-700 text-center font-medium">확인</Text>
-      </TouchableOpacity>
-    </View>
-  );
 
   return (
     <Modal
@@ -385,6 +252,15 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
                     </TouchableOpacity>
                   </View>
 
+                  {/* 시작 시간 */}
+                  <View className="mb-4">
+                    <SeniorTimePicker
+                      value={startTime}
+                      onChange={setStartTime}
+                      title="시작 시간을 선택해주세요"
+                    />
+                  </View>
+
                   {/* 종료 날짜 */}
                   <View className="mb-4">
                     <Text className="text-sm text-gray-600 mb-2">종료 날짜</Text>
@@ -397,6 +273,15 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
                     </TouchableOpacity>
                   </View>
 
+                  {/* 종료 시간 */}
+                  <View className="mb-4">
+                    <SeniorTimePicker
+                      value={endTime}
+                      onChange={setEndTime}
+                      title="종료 시간을 선택해주세요"
+                    />
+                  </View>
+
                   {showDatePicker && (
                     <DateTimePicker
                       value={showDatePicker === 'start' ? startDate : endDate}
@@ -405,48 +290,6 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
                       onChange={onDateChange}
                     />
                   )}
-
-                  {/* 시작 시간 */}
-                  <View className="mb-4">
-                    <Text className="text-sm text-gray-600 mb-2">시작 시간</Text>
-                    {!showStartTimePicker ? (
-                      <TouchableOpacity
-                        className="flex-row items-center border border-gray-300 rounded-lg px-4 py-3"
-                        onPress={() => openTimePicker('start')}
-                      >
-                        <Clock size={20} color="#6b7280" />
-                        <Text className="ml-3 text-gray-900">{startHours}:{startMinutes}</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <TimePickerUI
-                        type="start"
-                        hours={startHours}
-                        minutes={startMinutes}
-                        onClose={() => setShowStartTimePicker(false)}
-                      />
-                    )}
-                  </View>
-
-                  {/* 종료 시간 */}
-                  <View className="mb-4">
-                    <Text className="text-sm text-gray-600 mb-2">끝나는 시간</Text>
-                    {!showEndTimePicker ? (
-                      <TouchableOpacity
-                        className="flex-row items-center border border-gray-300 rounded-lg px-4 py-3"
-                        onPress={() => openTimePicker('end')}
-                      >
-                        <Clock size={20} color="#6b7280" />
-                        <Text className="ml-3 text-gray-900">{endHours}:{endMinutes}</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <TimePickerUI
-                        type="end"
-                        hours={endHours}
-                        minutes={endMinutes}
-                        onClose={() => setShowEndTimePicker(false)}
-                      />
-                    )}
-                  </View>
                 </View>
               )}
 

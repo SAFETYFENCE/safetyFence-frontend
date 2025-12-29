@@ -1,14 +1,14 @@
 import { useLocation } from '@/contexts/LocationContext';
 import { useMedicationManagement } from '@/hooks/useMedicationManagement';
+import { useBattery } from '@/hooks/useBattery';
 import { emergencyService } from '@/services/emergencyService';
-import { linkService } from '@/services/linkService';
 import { storage } from '@/utils/storage';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Alert, Linking, ScrollView, StatusBar, Text, ToastAndroid, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, BackHandler, ScrollView, StatusBar, Text, ToastAndroid, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import RNImmediatePhoneCall from 'react-native-phone-call';
 import MedicineManager from '../components/senior/MedicineManager';
 import TopHeader from '../components/senior/TopHeader';
 
@@ -27,6 +27,12 @@ export default function UserMainPage() {
         fetchMedications,
     } = useMedicationManagement();
 
+    // 배터리 모니터링 (5분마다 서버에 자동 업데이트)
+    const { batteryLevel, isCharging } = useBattery({
+        updateInterval: 5 * 60 * 1000, // 5분
+        autoUpdate: true,
+    });
+
     useEffect(() => {
         loadUserData();
 
@@ -38,6 +44,19 @@ export default function UserMainPage() {
             });
         }
     }, []);
+
+    // Android 뒤로가기 버튼 처리 (UserMainPage 포커스 시에만)
+    useFocusEffect(
+        useCallback(() => {
+            const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+                // 백그라운드 위치 추적 앱이므로 뒤로가기로 앱 종료 방지
+                // 홈 버튼으로 백그라운드 전환하도록 유도
+                return true;
+            });
+
+            return () => backHandler.remove();
+        }, [])
+    );
 
     const loadUserData = async () => {
         const name = await storage.getUserName();

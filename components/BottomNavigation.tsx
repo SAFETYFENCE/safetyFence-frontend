@@ -1,7 +1,7 @@
 import Global from '@/constants/Global';
 import { emergencyService } from '@/services/emergencyService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { Calendar, MapPin, Pill, User, Users } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Text, TouchableOpacity, View } from 'react-native';
@@ -14,7 +14,7 @@ interface BottomNavigationProps {
 type BottomTabScreenName = 'MapPage' | 'CalendarPage' | 'MyPage' | 'LinkPage' | 'MedicinePage';
 
 const BottomNavigation: React.FC<BottomNavigationProps> = ({ currentScreen }) => {
-  const navigation = useNavigation();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [isSendingEmergency, setIsSendingEmergency] = useState(false);
 
@@ -34,7 +34,7 @@ const BottomNavigation: React.FC<BottomNavigationProps> = ({ currentScreen }) =>
   }, []); // Run once on mount
 
   const navigateToScreen = (screenName: BottomTabScreenName): void => {
-    navigation.navigate(screenName as never); // Use navigation.navigate to preserve screen state
+    router.push(`/${screenName}`);
   };
 
   const getIconColor = (screenName: string) => {

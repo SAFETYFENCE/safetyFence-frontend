@@ -33,6 +33,9 @@ export const useLoginLogic = () => {
                 if (savedAutoLogin && apiKey) {
                     console.log('✅ 자동 로그인 시작');
 
+                    // FCM 토큰 갱신
+                    await initializeNotifications();
+
                     if (userRole === 'user') {
                         // 자동 로그인 시에는 startTracking()을 호출하지 않음
                         // UserMainPage에서 useEffect로 자동 시작됨
