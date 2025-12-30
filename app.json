@@ -40,6 +40,7 @@
       "startUrl": "/"
     },
     "android": {
+      "versionCode": 1,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
