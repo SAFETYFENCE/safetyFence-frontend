@@ -510,17 +510,19 @@ const UsersScreen: React.FC = () => {
           <View className="flex-row gap-2">
             <TouchableOpacity
               onPress={toggleSelectionMode}
-              className={`w-10 h-10 rounded-full items-center justify-center border ${isSelectionMode ? 'bg-gray-900 border-gray-900' : 'bg-white border-gray-200'
+              className={`px-4 py-2 rounded-full items-center justify-center border ${isSelectionMode ? 'bg-gray-900 border-gray-900' : 'bg-white border-gray-200'
                 }`}
             >
-              <CheckCircle2 size={20} color={isSelectionMode ? 'white' : '#4b5563'} strokeWidth={2} />
+              <Text className={`font-bold text-sm ${isSelectionMode ? 'text-white' : 'text-gray-700'}`}>
+                일괄작업
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              className="w-10 h-10 rounded-full items-center justify-center bg-green-500 shadow-md shadow-green-200"
+              className="px-4 py-2 rounded-full items-center justify-center bg-green-500 shadow-md shadow-green-200"
               onPress={() => setIsAddUserDialogOpen(true)}
             >
-              <Plus size={24} color="white" strokeWidth={3} />
+              <Text className="text-white font-bold text-sm">추가</Text>
             </TouchableOpacity>
           </View>
         </View>
