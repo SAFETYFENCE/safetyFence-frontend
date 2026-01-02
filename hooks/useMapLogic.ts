@@ -86,12 +86,22 @@ export const useMapLogic = () => {
     }) => {
         try {
             const apiType = data.type === 'permanent' ? 0 : 1;
+
+            // 날짜와 시간을 분리하여 전송
+            const startDate = data.startTime
+                ? `${data.startTime.getFullYear()}-${String(data.startTime.getMonth() + 1).padStart(2, '0')}-${String(data.startTime.getDate()).padStart(2, '0')}`
+                : null;
             const startTime = data.startTime
                 ? `${String(data.startTime.getHours()).padStart(2, '0')}:${String(data.startTime.getMinutes()).padStart(2, '0')}`
+                : null;
+
+            const endDate = data.endTime
+                ? `${data.endTime.getFullYear()}-${String(data.endTime.getMonth() + 1).padStart(2, '0')}-${String(data.endTime.getDate()).padStart(2, '0')}`
                 : null;
             const endTime = data.endTime
                 ? `${String(data.endTime.getHours()).padStart(2, '0')}:${String(data.endTime.getMinutes()).padStart(2, '0')}`
                 : null;
+
             const targetNumber = userRole === 'supporter' && Global.TARGET_NUMBER
                 ? Global.TARGET_NUMBER
                 : undefined;
@@ -100,7 +110,9 @@ export const useMapLogic = () => {
                 name: data.name,
                 address: data.address,
                 type: apiType,
+                startDate,
                 startTime,
+                endDate,
                 endTime,
             }, targetNumber);
 

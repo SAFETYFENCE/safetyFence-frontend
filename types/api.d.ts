@@ -93,8 +93,10 @@ export interface CreateGeofenceRequest {
   name: string;
   address: string;
   type: 0 | 1;
-  startTime?: string | null; // "HH:mm" 형식
-  endTime?: string | null; // "HH:mm" 형식
+  startDate?: string | null; // "yyyy-MM-dd" 형식 (일시적 지오펜스용)
+  startTime?: string | null; // "HH:mm" 형식 (일시적 지오펜스용)
+  endDate?: string | null; // "yyyy-MM-dd" 형식 (일시적 지오펜스용)
+  endTime?: string | null; // "HH:mm" 형식 (일시적 지오펜스용)
   latitude?: number;
   longitude?: number;
 }
