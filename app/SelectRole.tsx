@@ -18,6 +18,7 @@ type UserRole = 'user' | 'supporter' | null;
 export default function SelectRolePage() {
   const router = useRouter();
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const { startTracking, stopTracking, connectWebSocket, disconnectWebSocket } = useLocation();
 
   const handleRoleSelect = (role: 'user' | 'supporter') => {
@@ -25,43 +26,95 @@ export default function SelectRolePage() {
   };
 
   const handleContinue = async () => {
-    if (selectedRole) {
-      try {
-        console.log('선택한 역할:', selectedRole);
+    if (!selectedRole || isLoading) {
+      return;
+    }
 
-        Global.USER_ROLE = selectedRole;
-        await storage.setUserRole(selectedRole);
+    setIsLoading(true);
 
-        if (Global.USER_ROLE === 'user') {
+    try {
+      console.log('🎯 역할 선택 시작:', selectedRole);
+
+      Global.USER_ROLE = selectedRole;
+      await storage.setUserRole(selectedRole);
+      console.log('✅ 역할 저장 완료');
+
+      if (Global.USER_ROLE === 'user') {
+        // 이용자 모드 설정
+        console.log('👤 이용자 모드 초기화 시작...');
+
+        // 1. 위치 추적 시작
+        try {
+          console.log('📍 위치 추적 시작 중...');
           await startTracking();
-          await disconnectWebSocket();
-          connectWebSocket();
-          router.replace('/UserMainPage');
-        } else if (Global.USER_ROLE === 'supporter') {
-          await stopTracking();
-          await disconnectWebSocket();
-
-          // 보호자도 지오펜스 설정 등을 위해 위치 권한 필요
-          try {
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') {
-              Alert.alert(
-                '위치 권한 필요',
-                '지오펜스 설정 등의 기능을 사용하려면 위치 권한이 필요합니다.',
-                [{ text: '확인' }]
-              );
-            }
-          } catch (permError) {
-            console.warn('⚠️ 보호자 위치 권한 요청 실패:', permError);
-          }
-
-          router.replace('/LinkPage');
+          console.log('✅ 위치 추적 시작 완료');
+        } catch (trackError) {
+          console.error('❌ 위치 추적 시작 실패:', trackError);
+          setIsLoading(false);
+          Alert.alert(
+            '위치 권한 필요',
+            '이용자 모드는 위치 추적이 필요합니다.\n설정에서 위치 권한을 허용해주세요.',
+            [{ text: '확인' }]
+          );
+          return;
         }
 
-      } catch (error) {
-        console.error('역할 선택 중 오류:', error);
-        Alert.alert('오류', '역할 선택 중 문제가 발생했습니다.');
+        // 2. WebSocket 재연결 (기존 연결 정리 후)
+        console.log('🔌 WebSocket 재연결 준비...');
+        await disconnectWebSocket();
+        console.log('✅ 기존 WebSocket 연결 해제 완료');
+
+        // 3. 약간의 delay 후 재연결 (완전 종료 대기)
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        console.log('🔌 WebSocket 새 연결 시작...');
+        connectWebSocket();
+
+        // 4. WebSocket 연결 완료 대기 (최대 3초)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('✅ 이용자 모드 초기화 완료');
+
+        router.replace('/UserMainPage');
+
+      } else if (Global.USER_ROLE === 'supporter') {
+        // 보호자 모드 설정
+        console.log('👨‍👩‍👧 보호자 모드 초기화 시작...');
+
+        // 1. 위치 추적 중지
+        await stopTracking();
+        console.log('✅ 위치 추적 중지 완료');
+
+        // 2. WebSocket 연결 해제
+        await disconnectWebSocket();
+        console.log('✅ WebSocket 연결 해제 완료');
+
+        // 3. 보호자도 지오펜스 설정 등을 위해 위치 권한 필요
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert(
+              '위치 권한 필요',
+              '지오펜스 설정 등의 기능을 사용하려면 위치 권한이 필요합니다.',
+              [{ text: '확인' }]
+            );
+          }
+        } catch (permError) {
+          console.warn('⚠️ 보호자 위치 권한 요청 실패:', permError);
+        }
+
+        console.log('✅ 보호자 모드 초기화 완료');
+        router.replace('/LinkPage');
       }
+
+    } catch (error) {
+      console.error('❌ 역할 선택 중 오류:', error);
+      Alert.alert(
+        '오류',
+        '역할 선택 중 문제가 발생했습니다.\n' +
+        (error instanceof Error ? error.message : '알 수 없는 오류')
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -152,20 +205,26 @@ export default function SelectRolePage() {
         <View className="px-6 pb-20">
           <TouchableOpacity
             onPress={handleContinue}
-            disabled={!selectedRole}
-            className={`w-full py-4 rounded-2xl items-center justify-center shadow-lg ${selectedRole
-              ? selectedRole === 'user'
-                ? 'bg-green-600 shadow-green-200 active:bg-green-700'
-                : 'bg-blue-600 shadow-blue-200 active:bg-blue-700'
-              : 'bg-gray-200'
-              }`}
-            activeOpacity={selectedRole ? 0.8 : 1}
+            disabled={!selectedRole || isLoading}
+            className={`w-full py-4 rounded-2xl items-center justify-center shadow-lg ${
+              selectedRole && !isLoading
+                ? selectedRole === 'user'
+                  ? 'bg-green-600 shadow-green-200 active:bg-green-700'
+                  : 'bg-blue-600 shadow-blue-200 active:bg-blue-700'
+                : 'bg-gray-200'
+            }`}
+            activeOpacity={selectedRole && !isLoading ? 0.8 : 1}
           >
             <Text
-              className={`text-lg font-bold ${selectedRole ? 'text-white' : 'text-gray-400'
-                }`}
+              className={`text-lg font-bold ${selectedRole && !isLoading ? 'text-white' : 'text-gray-400'}`}
             >
-              {selectedRole === 'user' ? '이용자로 시작하기' : selectedRole === 'supporter' ? '보호자로 시작하기' : '역할을 선택해주세요'}
+              {isLoading
+                ? '초기화 중...'
+                : selectedRole === 'user'
+                  ? '이용자로 시작하기'
+                  : selectedRole === 'supporter'
+                    ? '보호자로 시작하기'
+                    : '역할을 선택해주세요'}
             </Text>
           </TouchableOpacity>
         </View>

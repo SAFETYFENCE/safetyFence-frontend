@@ -71,6 +71,7 @@ const CalendarPage: React.FC = () => {
     loadCalendarData,
     handleTodoSave,
     handleTodoDelete,
+    handleMedicineLogDelete,
     hasItemsOnDate,
     getSortedItemsForDate
   } = useCalendarData(todayDateStr);
@@ -104,9 +105,8 @@ const CalendarPage: React.FC = () => {
       return <LogCard log={item} />;
     } else if (item.itemType === 'schedule') {
       return <ScheduleCard schedule={item} />;
-
     } else if (item.itemType === 'medicine') {
-      return <MedicineCard log={item} />;
+      return <MedicineCard log={item} onDelete={handleMedicineLogDelete} />;
     } else {
       return <TodoCard todo={item} onDelete={handleTodoDelete} />;
     }

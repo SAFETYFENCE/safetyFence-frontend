@@ -30,6 +30,7 @@ export interface Log {
 
 export interface MedicineLog {
     id: number;
+    medicationId: number;
     medicineName: string;
     time: Date;
     date: string;

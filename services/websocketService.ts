@@ -13,6 +13,7 @@ export interface LocationData {
   latitude: number;
   longitude: number;
   timestamp?: number;
+  batteryLevel?: number;
 }
 
 export interface ReceivedLocationData extends LocationData {
@@ -32,6 +33,7 @@ class WebSocketService {
   private maxReconnectAttempts = 5;
   private reconnectDelay = 3000;
   private _isConnected = false;  // 연결 상태 플래그
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;  // 재연결 타이머 (누수 방지)
 
   /**
    * WebSocket 연결
@@ -136,6 +138,7 @@ class WebSocketService {
         },
         connectHeaders: {
           userNumber: userNumber,
+          'X-API-Key': Global.API_KEY,
         },
         // Heartbeat 설정: 백그라운드에서도 연결 유지
         heartbeatIncoming: 10000, // 서버로부터 10초마다 heartbeat 수신
@@ -147,6 +150,12 @@ class WebSocketService {
           console.log('✅ WebSocket 연결 성공');
           this._isConnected = true;  // 연결 상태 업데이트
           this.reconnectAttempts = 0;
+
+          // 재연결 시 기존 구독 정보 초기화 (새 클라이언트이므로 이전 구독은 무효)
+          this.subscriptions.clear();
+          this.locationCallbacks.clear();
+          console.log('🔄 구독 정보 초기화 (재연결)');
+
           this.connectionCallback?.(true);
         },
         onDisconnect: () => {
@@ -154,11 +163,18 @@ class WebSocketService {
           this._isConnected = false;  // 연결 상태 업데이트
           this.connectionCallback?.(false);
 
+          // 기존 재연결 타이머 정리 (중복 방지)
+          if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+          }
+
           // 자동 재연결
           if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
             console.log(`재연결 시도 ${this.reconnectAttempts}/${this.maxReconnectAttempts}...`);
-            setTimeout(() => {
+            this.reconnectTimer = setTimeout(() => {
+              this.reconnectTimer = null;
               this.connect(this.userNumber, this.connectionCallback || undefined);
             }, this.reconnectDelay);
           }
@@ -201,6 +217,13 @@ class WebSocketService {
    * WebSocket 연결 해제
    */
   async disconnect(): Promise<void> {
+    // 재연결 타이머 취소 (가장 먼저 실행 - 타이머 누수 방지)
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+      console.log('🔄 재연결 타이머 취소됨');
+    }
+
     if (this.client) {
       console.log('WebSocket 연결 해제 중...');
 
@@ -213,6 +236,9 @@ class WebSocketService {
 
       // 연결 상태 업데이트
       this._isConnected = false;
+
+      // 재연결 시도 횟수 리셋 (다음 connect 시 새로 시작)
+      this.reconnectAttempts = 0;
 
       // 클라이언트 비활성화 (await 추가)
       await this.client.deactivate();
@@ -237,6 +263,7 @@ class WebSocketService {
         latitude: location.latitude,
         longitude: location.longitude,
         timestamp: location.timestamp || Date.now(),
+        ...(location.batteryLevel !== undefined && { batteryLevel: location.batteryLevel }),
       };
 
       this.client.publish({

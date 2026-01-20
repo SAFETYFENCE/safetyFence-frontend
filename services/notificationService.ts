@@ -92,6 +92,17 @@ export const registerForPushNotifications = async (): Promise<string | null> => 
         showBadge: true,
         enableLights: true,
       });
+
+      // 약 복용 알림 채널
+      await Notifications.setNotificationChannelAsync('medication_reminders', {
+        name: '약 복용 알림',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#3b82f6', // 파란색
+        sound: 'default',
+        enableVibrate: true,
+        showBadge: true,
+      });
     }
 
     // FCM 기기 토큰 발급 (Expo Push 토큰이 아닌 순수 FCM 토큰)

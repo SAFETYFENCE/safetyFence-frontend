@@ -8,9 +8,8 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { storage } from '../utils/storage';
-import { sendLocationUpdate } from './locationTransport';
-import { geofenceService } from './geofenceService';
 import { checkGeofenceEntry } from '../utils/geofenceUtils';
+import { processGeofenceEntries } from './geofenceEntryService';
 
 // 백그라운드 위치 작업 이름
 export const BACKGROUND_LOCATION_TASK = 'background-location-task';
@@ -31,10 +30,15 @@ async function checkBackgroundGeofenceEntry(
     }
 
     console.log(`🔍 [백그라운드] 지오펜스 체크 시작: ${cache.data.length}개 지오펜스`);
+    // 각 지오펜스의 ID와 타입 로깅
+    cache.data.forEach((g, i) => {
+      console.log(`   [${i}] id=${g.id} (type: ${typeof g.id}), name=${g.name}, type=${g.type}`);
+    });
 
     // 2. 현재 진입 상태 읽기
     const entryState = await storage.getGeofenceEntryState();
-    console.log(`🔍 [백그라운드] 현재 진입 상태:`, entryState);
+    console.log(`🔍 [백그라운드] 현재 진입 상태:`, JSON.stringify(entryState));
+    console.log(`🔍 [백그라운드] entryState 키 개수: ${Object.keys(entryState).length}`);
 
     // 3. 진입/이탈 체크
     const result = checkGeofenceEntry(
@@ -46,21 +50,8 @@ async function checkBackgroundGeofenceEntry(
 
     console.log(`🔍 [백그라운드] 체크 결과: 진입=${result.entries.length}개, 이탈=${result.exits.length}개`);
 
-    // 4. 진입 처리
-    for (const entry of result.entries) {
-      // ⚠️ 중요: API 호출 전에 먼저 entryState 저장 (race condition 방지)
-      entryState[entry.geofenceId] = true;
-      await storage.setGeofenceEntryState(entryState);
-      console.log(`🔒 [백그라운드] ${entry.name} 진입 상태 저장 완료 (중복 방지)`);
-
-      try {
-        await geofenceService.recordEntry({ geofenceId: entry.geofenceId });
-        console.log(`✅ [백그라운드] 지오펜스 진입: ${entry.name}`);
-      } catch (error: any) {
-        // 일시형 지오펜스가 이미 삭제되었거나 중복 요청인 경우
-        console.warn(`⚠️ [백그라운드] 지오펜스 진입 기록 실패 (이미 처리됨): ${entry.name}`, error);
-      }
-    }
+    // 4. 진입 처리 (락 + 실패 시 재시도)
+    await processGeofenceEntries(result.entries, entryState, 'background');
 
     // 5. 이탈 처리 (영구 지오펜스만)
     for (const exit of result.exits) {
@@ -93,12 +84,22 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }: any) =>
   const { locations } = data;
   if (!locations?.length) return;
 
-  const location = locations[0];
+  // ⚠️ 중요: 배열의 마지막이 가장 최신 위치 (배치 처리 시 여러 위치가 올 수 있음)
+  const location = locations[locations.length - 1];
+  const locationAge = Date.now() - location.timestamp;
+
   console.log('📍 백그라운드 위치 수신:', {
     latitude: location.coords.latitude,
     longitude: location.coords.longitude,
     timestamp: location.timestamp,
+    age: `${Math.round(locationAge / 1000)}초 전`,
+    batchSize: locations.length,
   });
+
+  // 위치가 너무 오래된 경우 (60초 이상) 경고 로그
+  if (locationAge > 60000) {
+    console.warn(`⚠️ [백그라운드] 오래된 위치 감지: ${Math.round(locationAge / 1000)}초 전`);
+  }
 
   try {
     const userRole = await storage.getUserRole();
@@ -107,10 +108,10 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }: any) =>
       return;
     }
 
-    // 앱 상태 확인 (포그라운드면 위치 전송 생략, 지오펜스만 체크)
-    const appState = await storage.getItem('appState');
-    const isInForeground = appState === 'active';
-    console.log(`🔍 [백그라운드] 앱 상태: ${appState}, 포그라운드 여부: ${isInForeground}`);
+    // 앱 상태 확인 (타임스탬프 기반 - 포그라운드면 위치 전송 생략)
+    // 5초 이내 업데이트된 상태만 신뢰 (동기화 지연 문제 방지)
+    const isInForeground = await storage.isInForeground(5000);
+    console.log(`🔍 [백그라운드] 포그라운드 여부: ${isInForeground}`);
 
     // 주기적으로 지오펜스 캐시 갱신 (2분마다)
     const now = Date.now();
@@ -127,22 +128,14 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }: any) =>
       }
     }
 
-    // 포그라운드일 때는 위치 전송 생략 (포그라운드 서비스가 이미 전송 중)
-    if (!isInForeground) {
-      const result = await sendLocationUpdate({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        timestamp: location.timestamp,
-      });
-
-      if (!result.ok) {
-        console.warn('⚠️ 백그라운드 위치 전송 실패:', result.reason);
-      }
-    } else {
-      console.log('ℹ️ [백그라운드] 포그라운드 상태: 위치 전송 생략');
+    // 포그라운드 상태에서는 백그라운드 Task 자체의 처리를 중단
+    if (isInForeground) {
+      console.log('ℹ️ [백그라운드] 포그라운드 상태: Task 처리 종료');
+      return;
     }
 
-    // 백그라운드 geofence 체크 (항상 실행 - 포그라운드 체크의 백업)
+    // ⚠️ 백그라운드 위치 전송은 네이티브 서비스가 담당
+    // 여기서는 지오펜스 체크만 수행
     await checkBackgroundGeofenceEntry(
       location.coords.latitude,
       location.coords.longitude

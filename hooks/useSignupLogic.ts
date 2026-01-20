@@ -25,8 +25,8 @@ export const useSignupLogic = () => {
     const router = useRouter();
     const [formData, setFormData] = useState<SignupFormData>({
         name: '',
-        password: '',
-        confirmPassword: '',
+        password: '111',
+        confirmPassword: '111',
         birth: null,
         number: '',
         homeAddress: '',

@@ -7,10 +7,11 @@
  * - USER_ROLE: 사용자 역할 (user | supporter)
  */
 const Global = {
-  // API 서버 URL - Nginx 리버스 프록시를 통한 접속 (포트 80)
-  URL: 'http://54.116.21.196',
+  // API 서버 URL - HTTPS 도메인
+  URL: 'https://safetyfencecompany.com',
 
   // 사용자 정보
+  API_KEY: "",
   NUMBER: "",
   TARGET_NUMBER: "",
   TARGET_RELATION: "",

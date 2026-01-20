@@ -14,15 +14,35 @@ const STORAGE_KEYS = {
   TARGET_NUMBER: '@safetyFence:targetNumber',
   FCM_TOKEN: '@safetyFence:fcmToken',
   GEOFENCE_ENTRY_STATE: '@safetyFence:geofenceEntryState',
+  GEOFENCE_ENTRY_LOCKS: '@safetyFence:geofenceEntryLocks',
   GEOFENCE_CACHE: '@safetyFence:geofenceCache',
   MEDICINE_LIST: '@safetyFence:medicineList',
   MEDICINE_LOGS: '@safetyFence:medicineLogs',
   AUTO_LOGIN: '@safetyFence:autoLogin',
+  DAILY_DISTANCE: '@safetyFence:dailyDistance',
+  APP_STATE_DATA: '@safetyFence:appStateData',  // 앱 상태 (타임스탬프 포함)
 } as const;
 
 interface GeofenceCache {
   data: GeofenceItem[];
   timestamp: number;
+}
+
+export interface DailyDistanceData {
+  distance: number;        // 누적 거리 (미터)
+  date: string;            // YYYY-MM-DD
+  lastUpdate: number;      // 마지막 업데이트 타임스탬프
+  lastLatitude: number;    // 마지막 유효 위도
+  lastLongitude: number;   // 마지막 유효 경도
+}
+
+export interface AppStateData {
+  state: string;           // 'active' | 'inactive' | 'background'
+  timestamp: number;       // 상태 변경 시간
+}
+
+export interface GeofenceEntryLocks {
+  [key: number]: number; // geofenceId -> timestamp(ms)
 }
 
 export const storage = {
@@ -196,7 +216,9 @@ export const storage = {
   async getGeofenceEntryState(): Promise<{ [key: number]: boolean }> {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.GEOFENCE_ENTRY_STATE);
-      return data ? JSON.parse(data) : {};
+      const parsed = data ? JSON.parse(data) : {};
+      console.log(`📖 [Storage] getGeofenceEntryState: raw="${data}", parsed=${JSON.stringify(parsed)}`);
+      return parsed;
     } catch (error) {
       console.error('지오펜스 진입 상태 가져오기 실패:', error);
       return {};
@@ -206,7 +228,10 @@ export const storage = {
   // 지오펜스 진입 상태 저장
   async setGeofenceEntryState(state: { [key: number]: boolean }): Promise<void> {
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.GEOFENCE_ENTRY_STATE, JSON.stringify(state));
+      const json = JSON.stringify(state);
+      console.log(`💾 [Storage] setGeofenceEntryState: ${json}`);
+      await AsyncStorage.setItem(STORAGE_KEYS.GEOFENCE_ENTRY_STATE, json);
+      console.log(`✅ [Storage] setGeofenceEntryState 완료`);
     } catch (error) {
       console.error('지오펜스 진입 상태 저장 실패:', error);
       throw error;
@@ -341,5 +366,97 @@ export const storage = {
       console.error('자동 로그인 설정 가져오기 실패:', error);
       return true; // 기본값
     }
-  }
+  },
+
+  // ==================== 일일 이동거리 관련 ====================
+
+  // 일일 이동거리 데이터 가져오기
+  async getDailyDistance(date: string): Promise<DailyDistanceData | null> {
+    try {
+      const key = `${STORAGE_KEYS.DAILY_DISTANCE}_${date}`;
+      const data = await AsyncStorage.getItem(key);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('일일 이동거리 가져오기 실패:', error);
+      return null;
+    }
+  },
+
+  // 일일 이동거리 데이터 저장
+  async setDailyDistance(data: DailyDistanceData): Promise<void> {
+    try {
+      const key = `${STORAGE_KEYS.DAILY_DISTANCE}_${data.date}`;
+      await AsyncStorage.setItem(key, JSON.stringify(data));
+    } catch (error) {
+      console.error('일일 이동거리 저장 실패:', error);
+      throw error;
+    }
+  },
+
+  // ==================== 앱 상태 관리 (타임스탬프 포함) ====================
+
+  // 앱 상태 저장 (타임스탬프 포함 - 백그라운드 Task와의 동기화용)
+  async setAppStateWithTimestamp(state: string): Promise<void> {
+    try {
+      const data: AppStateData = {
+        state,
+        timestamp: Date.now(),
+      };
+      await AsyncStorage.setItem(STORAGE_KEYS.APP_STATE_DATA, JSON.stringify(data));
+    } catch (error) {
+      console.error('앱 상태 저장 실패:', error);
+      // 저장 실패해도 앱 동작에 치명적이지 않으므로 throw하지 않음
+    }
+  },
+
+  // 앱 상태 가져오기 (타임스탬프 포함)
+  async getAppStateWithTimestamp(): Promise<AppStateData | null> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.APP_STATE_DATA);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('앱 상태 가져오기 실패:', error);
+      return null;
+    }
+  },
+
+  // 포그라운드 여부 확인 (타임스탬프 유효성 검사 포함)
+  async isInForeground(maxAgeMs: number = 5000): Promise<boolean> {
+    try {
+      const data = await this.getAppStateWithTimestamp();
+      if (!data) return false;
+
+      const age = Date.now() - data.timestamp;
+      // 상태가 maxAgeMs 이내에 업데이트되지 않았으면 신뢰할 수 없음
+      if (age > maxAgeMs) {
+        console.log(`⚠️ appState 오래됨 (${age}ms), 백그라운드로 간주`);
+        return false;
+      }
+
+      return data.state === 'active';
+    } catch (error) {
+      console.error('포그라운드 여부 확인 실패:', error);
+      return false;
+    }
+  },
+
+  // ==================== 지오펜스 진입 락 ====================
+
+  async getGeofenceEntryLocks(): Promise<GeofenceEntryLocks> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.GEOFENCE_ENTRY_LOCKS);
+      return data ? JSON.parse(data) : {};
+    } catch (error) {
+      console.error('지오펜스 진입 락 가져오기 실패:', error);
+      return {};
+    }
+  },
+
+  async setGeofenceEntryLocks(locks: GeofenceEntryLocks): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.GEOFENCE_ENTRY_LOCKS, JSON.stringify(locks));
+    } catch (error) {
+      console.error('지오펜스 진입 락 저장 실패:', error);
+    }
+  },
 };

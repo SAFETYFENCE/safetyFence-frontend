@@ -38,14 +38,18 @@ const LoginForm: React.FC<Props> = ({
                 autoCorrect={false}
             />
 
-            <Text className="text-gray-600 font-semibold mb-2 ml-1">비밀번호</Text>
+            <View className="flex-row items-center mb-2 ml-1">
+                <Text className="text-gray-600 font-semibold">비밀번호</Text>
+                <Text className="text-green-600 text-xs ml-2">(비밀번호는 "111" 고정입니다)</Text>
+            </View>
             <TextInput
-                className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-4 text-gray-900 text-base mb-4"
-                placeholder="비밀번호를 입력하세요"
+                className="bg-gray-100 border border-gray-200 rounded-2xl px-4 py-4 text-gray-900 text-base mb-4"
+                placeholder="111"
                 placeholderTextColor="#9ca3af"
                 value={password}
                 onChangeText={onPasswordChange}
                 secureTextEntry
+                editable={false}
             />
 
             {/* 자동 로그인 체크박스 */}

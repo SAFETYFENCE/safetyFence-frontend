@@ -1,8 +1,11 @@
 import Global from '@/constants/Global';
+import { useLocation } from '@/contexts/LocationContext';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { Alert, StatusBar, View } from 'react-native';
 import BottomNavigation from '../components/BottomNavigation';
+import DailyDistanceCard from '../components/common/DailyDistanceCard';
 import GeofenceModal from '../components/GeofenceModal';
 import KakaoMap, { KakaoMapHandle } from '../components/KakaoMap';
 import MapErrorView from '../components/map/MapErrorView';
@@ -13,6 +16,7 @@ import { useMapLogic } from '../hooks/useMapLogic';
 
 const MainPage: React.FC = () => {
   const router = useRouter();
+  const { dailyDistanceKm, targetDailyDistanceKm, fetchDailyDistance } = useLocation();
   const {
     userRole,
     isLoading,
@@ -50,6 +54,14 @@ const MainPage: React.FC = () => {
       hasMovedToInitialLocation.current = true;
     }
   }, [currentLocation, targetLocation, moveToLocation, userRole, hasMovedToInitialLocation]);
+
+  // 페이지 진입 시 이동거리 새로고침
+  useFocusEffect(
+    useCallback(() => {
+      console.log('📊 MapPage 진입: 이동거리 새로고침');
+      fetchDailyDistance();
+    }, [fetchDailyDistance])
+  );
 
 
   const moveToMyLocation = () => {
@@ -113,6 +125,26 @@ const MainPage: React.FC = () => {
         headerSubText={headerSubText}
         onBack={userRole === 'user' ? () => router.back() : undefined}
       />
+
+      {/* 사용자 역할일 때 이동거리 표시 */}
+      {userRole === 'user' && (
+        <View style={{ position: 'absolute', top: 140, left: 20, right: 20 }}>
+          <DailyDistanceCard
+            distanceKm={dailyDistanceKm}
+            compact={true}
+          />
+        </View>
+      )}
+
+      {/* 보호자 역할일 때 선택한 사용자의 이동거리 표시 */}
+      {userRole === 'supporter' && Global.TARGET_NUMBER && (
+        <View style={{ position: 'absolute', top: 140, left: 20, right: 20 }}>
+          <DailyDistanceCard
+            distanceKm={targetDailyDistanceKm}
+            compact={true}
+          />
+        </View>
+      )}
 
       <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
         <MapFloatingButtons

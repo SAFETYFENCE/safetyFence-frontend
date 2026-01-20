@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   SafeAreaView,
   ScrollView,
   Text,
@@ -72,6 +73,20 @@ const MyPage: React.FC = () => {
       console.error('센터 주소 변경 실패:', error);
       const message = error.response?.data?.message || '주소 변경에 실패했습니다.';
       Alert.alert('오류', message);
+    }
+  };
+
+  const handleOpenWebURL = async (url: string) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert('오류', 'URL을 열 수 없습니다.');
+      }
+    } catch (error) {
+      console.error('URL 열기 실패:', error);
+      Alert.alert('오류', '페이지를 여는 중 문제가 발생했습니다.');
     }
   };
 
@@ -146,7 +161,8 @@ const MyPage: React.FC = () => {
               setAddressType('center');
               setAddressModalVisible(true);
             }}
-            onPrivacyPolicy={() => router.push('/PrivacyPolicyPage')}
+            onPrivacyPolicy={() => handleOpenWebURL('https://dysxtf9kcwozu.cloudfront.net/privacy-policy')}
+            onAccountDeletion={() => handleOpenWebURL('https://dysxtf9kcwozu.cloudfront.net/account-deletion')}
             onLogout={handleLogout}
           />
 

@@ -127,6 +127,7 @@ export const useCalendarData = (todayDateStr: string) => {
 
                             return {
                                 id: historyItem.logId,
+                                medicationId: medication.id,
                                 medicineName: medication.name,
                                 time: checkedTime,
                                 taken: true,
@@ -216,6 +217,34 @@ export const useCalendarData = (todayDateStr: string) => {
         });
     };
 
+    // 약 복용 기록 삭제
+    const handleMedicineLogDelete = async (medicationId: number, logId: number) => {
+        return new Promise<void>((resolve) => {
+            Alert.alert(
+                '복용 기록 삭제',
+                '이 복용 기록을 삭제하시겠습니까?',
+                [
+                    { text: '취소', style: 'cancel' },
+                    {
+                        text: '삭제',
+                        style: 'destructive',
+                        onPress: async () => {
+                            try {
+                                await medicationService.uncheck(medicationId);
+                                setMedicineLogs(prev => prev.filter(log => log.id !== logId));
+                                Alert.alert('성공', '복용 기록이 삭제되었습니다.');
+                                resolve();
+                            } catch (error) {
+                                console.error('복용 기록 삭제 실패:', error);
+                                Alert.alert('오류', '복용 기록 삭제에 실패했습니다.');
+                            }
+                        },
+                    },
+                ]
+            );
+        });
+    };
+
     const itemsByDate = useMemo(() => {
         const map = new Map<string, CalendarItem[]>();
 
@@ -275,6 +304,7 @@ export const useCalendarData = (todayDateStr: string) => {
 
         handleTodoSave,
         handleTodoDelete,
+        handleMedicineLogDelete,
         itemsByDate,
         hasItemsOnDate,
         getSortedItemsForDate

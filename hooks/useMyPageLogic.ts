@@ -7,9 +7,11 @@ import { storage } from '@/utils/storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert } from 'react-native';
+import { useLocation } from '@/contexts/LocationContext';
 
 export const useMyPageLogic = () => {
     const router = useRouter();
+    const { stopTracking, disconnectWebSocket } = useLocation();
     const [userData, setUserData] = useState<MyPageData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -65,13 +67,30 @@ export const useMyPageLogic = () => {
                     text: '로그아웃',
                     onPress: async () => {
                         try {
+                            console.log('🚪 로그아웃 시작 - 리소스 정리 중...');
+
+                            // 1. 위치 추적 중지 (백그라운드 태스크, accelerometer 등)
+                            await stopTracking();
+                            console.log('✅ 위치 추적 중지 완료');
+
+                            // 2. WebSocket 연결 해제
+                            await disconnectWebSocket();
+                            console.log('✅ WebSocket 연결 해제 완료');
+
+                            // 3. 저장된 데이터 정리
                             await storage.clearAll();
+                            console.log('✅ 저장 데이터 정리 완료');
+
+                            // 4. 전역 변수 초기화
                             Global.NUMBER = "";
                             Global.TARGET_NUMBER = "";
                             Global.USER_ROLE = "";
+                            Global.TARGET_RELATION = "";
+
+                            console.log('✅ 로그아웃 완료 - 로그인 화면으로 이동');
                             router.replace('/');  // push → replace로 변경하여 스택 정리
                         } catch (error) {
-                            console.error('로그아웃 실패:', error);
+                            console.error('❌ 로그아웃 실패:', error);
                             Alert.alert('오류', '로그아웃 처리 중 문제가 발생했습니다.');
                         }
                     },

@@ -86,7 +86,8 @@ const GeofenceModal: React.FC<GeofenceModalProps> = ({
       return;
     }
 
-    if (formData.type === 'temporary' && (!formData.startTime || !formData.endTime)) {
+    // 일시적 영역의 경우 시간 검증 (startTime, endTime은 기본값이 있어 항상 설정됨)
+    if (formData.type === 'temporary' && (!startTime || !endTime)) {
       Alert.alert('입력 오류', '일시적 영역의 경우 시작 시간과 종료 시간을 모두 설정해주세요.');
       return;
     }

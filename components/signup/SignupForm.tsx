@@ -89,28 +89,28 @@ const SignupForm: React.FC<Props> = ({
 
             {/* 비밀번호 */}
             <View className="mb-5">
-                <Text className="text-gray-600 font-semibold mb-2 ml-1">비밀번호</Text>
+                <View className="flex-row items-center mb-2 ml-1">
+                    <Text className="text-gray-600 font-semibold">비밀번호</Text>
+                    <Text className="text-green-600 text-xs ml-2">(비밀번호는 "111" 고정입니다)</Text>
+                </View>
                 <TextInput
-                    className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-gray-900 text-base mb-3"
-                    placeholder="비밀번호를 입력하세요"
+                    className="bg-gray-100 border border-gray-200 rounded-2xl px-4 py-3.5 text-gray-900 text-base mb-3"
+                    placeholder="111"
                     value={formData.password}
                     onChangeText={(text) => onInputChange("password", text)}
                     secureTextEntry
                     placeholderTextColor="#9CA3AF"
+                    editable={false}
                 />
                 <TextInput
-                    className="bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3.5 text-gray-900 text-base"
-                    placeholder="비밀번호 확인"
+                    className="bg-gray-100 border border-gray-200 rounded-2xl px-4 py-3.5 text-gray-900 text-base"
+                    placeholder="111"
                     value={formData.confirmPassword}
                     onChangeText={(text) => onInputChange("confirmPassword", text)}
                     secureTextEntry
                     placeholderTextColor="#9CA3AF"
+                    editable={false}
                 />
-                {formData.password && formData.confirmPassword && (
-                    <Text className={`text-xs mt-2 ml-1 ${formData.password === formData.confirmPassword ? 'text-green-600' : 'text-red-500'}`}>
-                        {formData.password === formData.confirmPassword ? '비밀번호가 일치합니다' : '비밀번호가 일치하지 않습니다'}
-                    </Text>
-                )}
             </View>
 
             {/* 주소 */}

@@ -1,13 +1,14 @@
 import { MedicineLog } from '@/types/calendar';
-import { Clock, Pill } from 'lucide-react-native';
+import { Clock, Pill, Trash2 } from 'lucide-react-native';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 
 interface MedicineCardProps {
     log: MedicineLog;
+    onDelete?: (medicationId: number, logId: number) => void;
 }
 
-export default function MedicineCard({ log }: MedicineCardProps) {
+export default function MedicineCard({ log, onDelete }: MedicineCardProps) {
     const timeString = `${log.time.getHours().toString().padStart(2, '0')}:${log.time.getMinutes().toString().padStart(2, '0')}`;
 
     return (
@@ -28,6 +29,15 @@ export default function MedicineCard({ log }: MedicineCardProps) {
                         </Text>
                     </View>
                 </View>
+                {onDelete && (
+                    <TouchableOpacity
+                        onPress={() => onDelete(log.medicationId, log.id)}
+                        activeOpacity={0.7}
+                        className="bg-red-50 w-10 h-10 rounded-full items-center justify-center"
+                    >
+                        <Trash2 size={18} color="#ef4444" />
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );

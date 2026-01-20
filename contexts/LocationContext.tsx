@@ -20,15 +20,18 @@
 
 import Global from '@/constants/Global';
 import * as Location from 'expo-location';
-import { Accelerometer } from 'expo-sensors';
+import * as Battery from 'expo-battery';
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Alert, AppState, AppStateStatus, Linking } from 'react-native';
-import { startBackgroundLocationTracking, stopBackgroundLocationTracking } from '../services/backgroundLocationService';
+import { startNativeBackgroundLocation, stopNativeBackgroundLocation } from '../services/nativeBackgroundLocation';
+import { checkAndRequestBatteryOptimization } from '../utils/batteryOptimization';
 import { geofenceService } from '../services/geofenceService';
+import { processGeofenceEntries } from '../services/geofenceEntryService';
+import { locationService } from '../services/locationService';
 import { sendLocationUpdate } from '../services/locationTransport';
 import { websocketService } from '../services/websocketService';
 import { setupNotificationListeners, cleanupNotificationListeners } from '../services/notificationService';
-import { checkGeofenceEntry } from '../utils/geofenceUtils';
+import { checkGeofenceEntry, calculateDistance } from '../utils/geofenceUtils';
 import { storage } from '../utils/storage';
 import type { GeofenceItem } from '../types/api';
 
@@ -61,12 +64,19 @@ interface LocationContextState {
   geofences: GeofenceItem[];
   loadGeofences: () => Promise<void>;
 
+  // 일일 이동거리
+  dailyDistance: number;        // 누적 거리 (미터) - 로컬 계산
+  dailyDistanceKm: number;      // 킬로미터 (소수점 2자리) - 서버 계산
+  targetDailyDistanceKm: number; // 보호자용: 선택한 사용자의 이동거리 (킬로미터)
+  dailyDistanceLoading: boolean; // 이동거리 로딩 상태
+
   // 함수
   startTracking: () => Promise<void>;
   stopTracking: () => Promise<void>;
   connectWebSocket: () => void;
   disconnectWebSocket: () => Promise<void>;
   setSupporterTarget: (targetNumber: string) => void;
+  fetchDailyDistance: (targetNumber?: string) => Promise<void>; // 일일 이동거리 새로고침
 }
 
 // Context 생성
@@ -89,13 +99,77 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
   const [lastGeofenceCheck, setLastGeofenceCheck] = useState<{ [key: number]: boolean }>({});
   const lastGeofenceCheckRef = useRef<{ [key: number]: boolean }>({});
 
+  // 일일 이동거리 상태
+  const [dailyDistance, setDailyDistance] = useState<number>(0);
+  const dailyDistanceRef = useRef<number>(0);
+  const [dailyDistanceKm, setDailyDistanceKm] = useState<number>(0);
+  const [targetDailyDistanceKm, setTargetDailyDistanceKm] = useState<number>(0);
+  const [dailyDistanceLoading, setDailyDistanceLoading] = useState<boolean>(false);
+
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const websocketSendInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const appState = useRef<AppStateStatus>(AppState.currentState);
-  const stopTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const accelerometerSubscription = useRef<{ remove: () => void } | null>(null);
   const supporterTargetRef = useRef<string | null>(null);
   const currentLocationRef = useRef<RealTimeLocation | null>(null);
+  const isTrackingRef = useRef<boolean>(false);  // isTracking 상태 동기화용 (stale closure 방지)
+  const isTransitioningRef = useRef<boolean>(false);  // AppState 전환 락 (race condition 방지)
+
+  /**
+   * 일일 이동거리 업데이트
+   */
+  const updateDailyDistance = async (newLocation: RealTimeLocation) => {
+    // 사용자만 계산
+    if (Global.USER_ROLE !== 'user') return;
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+
+      // 오늘 데이터 로드
+      let distanceData = await storage.getDailyDistance(today);
+
+      // 새로운 날이면 초기화
+      if (!distanceData || distanceData.date !== today) {
+        distanceData = {
+          distance: 0,
+          date: today,
+          lastUpdate: newLocation.timestamp,
+          lastLatitude: newLocation.latitude,
+          lastLongitude: newLocation.longitude,
+        };
+      }
+
+      // 이전 위치가 있으면 거리 계산
+      if (distanceData.lastLatitude && distanceData.lastLongitude) {
+        const distance = calculateDistance(
+          distanceData.lastLatitude,
+          distanceData.lastLongitude,
+          newLocation.latitude,
+          newLocation.longitude
+        );
+
+        // GPS 오류 필터링: 2초에 100m 이상 이동 시 제외
+        const timeDiff = (newLocation.timestamp - distanceData.lastUpdate) / 1000;
+        const maxDistance = 50 * timeDiff; // 50m/s = 180km/h
+
+        if (distance <= maxDistance && distance < 100) {
+          distanceData.distance += distance;
+          setDailyDistance(distanceData.distance);
+          dailyDistanceRef.current = distanceData.distance;
+        } else if (distance >= 100) {
+          console.warn(`⚠️ GPS 오류 감지: ${distance.toFixed(1)}m 이동 (${timeDiff.toFixed(1)}초) - 필터링됨`);
+        }
+      }
+
+      // 마지막 위치 업데이트 및 저장
+      distanceData.lastLatitude = newLocation.latitude;
+      distanceData.lastLongitude = newLocation.longitude;
+      distanceData.lastUpdate = newLocation.timestamp;
+
+      await storage.setDailyDistance(distanceData);
+    } catch (error) {
+      console.error('❌ 일일 이동거리 업데이트 실패:', error);
+    }
+  };
 
   /**
    * 위치 업데이트 공통 처리 함수
@@ -121,7 +195,55 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
 
     console.log('📍 위치 업데이트 (포그라운드):', realTimeLocation);
 
+    // 일일 이동거리 업데이트
+    await updateDailyDistance(realTimeLocation);
+
     // 위치 전송은 별도 setInterval이 담당 (중복 방지)
+  };
+
+  /**
+   * watchPositionAsync 시작 (재시도 로직 포함)
+   * 일시적 GPS 오류 등에서 복구하기 위한 헬퍼 함수
+   */
+  const startWatchPositionWithRetry = async (maxRetries: number = 3): Promise<boolean> => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // 기존 subscription 정리
+        if (locationSubscription.current) {
+          try {
+            locationSubscription.current.remove();
+          } catch (e) {
+            // 이미 제거된 경우 무시
+          }
+          locationSubscription.current = null;
+        }
+
+        const sub = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 2000,
+            distanceInterval: 10,
+          },
+          handleLocationUpdate
+        );
+
+        locationSubscription.current = sub;
+        console.log(`✅ watchPositionAsync 시작 성공 (시도 ${attempt}/${maxRetries})`);
+        return true;
+      } catch (error) {
+        console.warn(`⚠️ watchPositionAsync 시작 실패 (시도 ${attempt}/${maxRetries}):`, error);
+
+        if (attempt < maxRetries) {
+          // 지수 백오프: 1초, 2초, 4초...
+          const delay = Math.pow(2, attempt - 1) * 1000;
+          console.log(`⏳ ${delay}ms 후 재시도...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    console.error('❌ watchPositionAsync 시작 최종 실패');
+    return false;
   };
 
   /**
@@ -239,27 +361,22 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
       setError(null);
       setIsLoading(false);
 
-      // 백그라운드 위치 추적 시작 (포그라운드에서 미리 시작해야 함!) - 이용자만
+      // 백그라운드 지오펜스 체크용 Task 등록 (포그라운드에서만 가능)
       if (Global.USER_ROLE === 'user') {
         try {
-          console.log('📍 백그라운드 위치 서비스 시작 (포그라운드에서)');
+          const { startBackgroundLocationTracking } = await import('../services/backgroundLocationService');
           const started = await startBackgroundLocationTracking();
           if (started) {
-            console.log('✅ 백그라운드 위치 서비스 준비 완료');
+            console.log('✅ 백그라운드 지오펜스 Task 등록 완료');
           } else {
-            console.warn('⚠️ 백그라운드 위치 서비스 시작 실패 (권한 또는 제한사항)');
+            console.warn('⚠️ 백그라운드 지오펜스 Task 등록 실패 (권한/제한)');
           }
         } catch (error) {
-          console.warn('⚠️ 백그라운드 위치 서비스 시작 중 오류:', error);
+          console.warn('⚠️ 백그라운드 지오펜스 Task 등록 중 오류:', error);
         }
 
-        // 움직임 감지 시작 (배터리 최적화)
-        try {
-          setupMovementDetection();
-          console.log('✅ 배터리 최적화: 움직임 감지 시작');
-        } catch (error) {
-          console.warn('⚠️ 움직임 감지 설정 실패:', error);
-        }
+        // 배터리 최적화 안내 (Android, 최초 1회)
+        checkAndRequestBatteryOptimization();
       }
 
       console.log('✅ 위치 추적 시작 완료');
@@ -281,68 +398,9 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
       console.log('📍 위치 추적 중지');
     }
 
-    // 백그라운드 위치 추적도 중지
-    await stopBackgroundLocationTracking();
+    // 네이티브 백그라운드 위치 추적 중지
+    await stopNativeBackgroundLocation();
 
-    // 움직임 감지 타이머 정리
-    if (stopTimeout.current) {
-      clearTimeout(stopTimeout.current);
-      stopTimeout.current = null;
-    }
-
-    // Accelerometer 구독 해제
-    if (accelerometerSubscription.current) {
-      accelerometerSubscription.current.remove();
-      accelerometerSubscription.current = null;
-    }
-  };
-
-  /**
-   * 움직임 감지 설정 (배터리 최적화)
-   * 백그라운드에서만 작동 - 포그라운드에서는 watchPositionAsync가 작동 중
-   */
-  const setupMovementDetection = () => {
-    Accelerometer.setUpdateInterval(1000); // 1초 간격
-    const subscription = Accelerometer.addListener(accelerometerData => {
-      const { x, y, z } = accelerometerData;
-      const magnitude = Math.sqrt(x * x + y * y + z * z);
-
-      // 포그라운드에서는 움직임 감지 무시 (watchPositionAsync가 작동 중)
-      const isBackground = appState.current.match(/inactive|background/);
-      if (!isBackground) {
-        return;
-      }
-
-      if (magnitude > 1.1) { // 움직임 감지
-        if (stopTimeout.current) {
-          clearTimeout(stopTimeout.current);
-          stopTimeout.current = null;
-          console.log('📱 움직임 감지됨, 위치 추적 중지 타이머 취소');
-        }
-        // 백그라운드 상태에서만 백그라운드 위치 추적 재시작
-        if (Global.USER_ROLE === 'user') {
-          startBackgroundLocationTracking().then(started => {
-            if (started) {
-              console.log('✅ 움직임 감지: 백그라운드 위치 추적 활성화');
-            }
-          });
-        }
-      } else { // 움직임 없음
-        if (!stopTimeout.current) {
-          console.log('📱 움직임 없음, 10분 후 위치 추적 중지 예약');
-          stopTimeout.current = setTimeout(() => {
-            if (Global.USER_ROLE === 'user') {
-              stopBackgroundLocationTracking().then(() => {
-                console.log('⏸️ 배터리 절약: 백그라운드 위치 추적 중지');
-              });
-            }
-            stopTimeout.current = null;
-          }, 600000); // 10분
-        }
-      }
-    });
-
-    accelerometerSubscription.current = subscription;
   };
 
   const subscribeToSupporterTarget = (targetNumber: string) => {
@@ -471,11 +529,57 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
   }, []);
 
   /**
+   * 일일 이동거리 조회 (서버 API)
+   * - 이용자: 본인의 이동거리
+   * - 보호자: targetNumber가 있으면 해당 이용자, 없으면 선택된 이용자
+   */
+  const fetchDailyDistance = useCallback(async (targetNumber?: string) => {
+    try {
+      setDailyDistanceLoading(true);
+
+      if (Global.USER_ROLE === 'user') {
+        // 이용자: 본인 이동거리
+        const response = await locationService.getDailyDistance();
+        setDailyDistanceKm(response.distanceKm);
+        console.log(`📊 일일 이동거리 조회 성공: ${response.distanceKm} km`);
+      } else if (Global.USER_ROLE === 'supporter') {
+        // 보호자: 선택한 이용자의 이동거리
+        const target = targetNumber || Global.TARGET_NUMBER;
+        if (!target) {
+          console.log('ℹ️ 보호자 모드: 이용자를 먼저 선택해주세요');
+          setTargetDailyDistanceKm(0);
+          return;
+        }
+        const response = await locationService.getDailyDistance(target);
+        setTargetDailyDistanceKm(response.distanceKm);
+        console.log(`📊 이용자(${target}) 일일 이동거리 조회 성공: ${response.distanceKm} km`);
+      }
+    } catch (error) {
+      console.error('❌ 일일 이동거리 조회 실패:', error);
+      // 에러 시 0으로 설정
+      if (Global.USER_ROLE === 'user') {
+        setDailyDistanceKm(0);
+      } else {
+        setTargetDailyDistanceKm(0);
+      }
+    } finally {
+      setDailyDistanceLoading(false);
+    }
+  }, []);
+
+  /**
    * currentLocation을 ref에 동기화 (의존성 문제 해결)
    */
   useEffect(() => {
     currentLocationRef.current = currentLocation;
   }, [currentLocation]);
+
+  /**
+   * isTracking을 ref에 동기화 (AppState 핸들러의 stale closure 방지)
+   */
+  useEffect(() => {
+    isTrackingRef.current = isTracking;
+  }, [isTracking]);
 
   /**
    * AsyncStorage에서 초기 진입 상태 로드 (이용자만)
@@ -511,11 +615,25 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
       const location = currentLocationRef.current;
       if (!location) return;
 
-      console.log('📡 포그라운드: 위치 전송 시도');
+      // ⚠️ 포그라운드 상태 갱신 (백그라운드 Task와 중복 방지)
+      await storage.setAppStateWithTimestamp('active');
+
+      // 배터리 레벨 가져오기
+      let batteryLevel: number | undefined;
+      try {
+        const level = await Battery.getBatteryLevelAsync();
+        batteryLevel = Math.round(level * 100);
+      } catch (error) {
+        console.warn('⚠️ 포그라운드 배터리 레벨 조회 실패:', error);
+        batteryLevel = undefined;
+      }
+
+      console.log(`📡 포그라운드: 위치 전송 시도 (배터리: ${batteryLevel}%)`);
       const result = await sendLocationUpdate({
         latitude: location.latitude,
         longitude: location.longitude,
         timestamp: location.timestamp,
+        batteryLevel,
       });
       if (!result.ok) {
         console.warn('⚠️ 포그라운드 위치 전송 실패:', result.reason);
@@ -540,57 +658,59 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
 
   /**
    * AppState 변경 감지 (포그라운드/백그라운드)
+   *
+   * 개선 사항:
+   * - isTransitioningRef로 race condition 방지 (빠른 전환 시)
+   * - inactive → active와 background → active 분리 처리
+   * - isTrackingRef 사용으로 stale closure 방지
+   * - 타임스탬프 기반 appState 저장 (백그라운드 Task 동기화)
    */
   useEffect(() => {
     const subscription = AppState.addEventListener('change', async (nextAppState) => {
+      // 🔒 전환 중이면 무시 (race condition 방지)
+      if (isTransitioningRef.current) {
+        console.log(`⏳ 이미 상태 전환 중, 무시: ${nextAppState}`);
+        return;
+      }
+
+      // inactive 상태는 빠르게 처리 (전환 락 없이)
+      if (nextAppState === 'inactive') {
+        await storage.setAppStateWithTimestamp(nextAppState);
+        appState.current = nextAppState;
+        return;
+      }
+
+      // 🔒 전환 락 시작
+      isTransitioningRef.current = true;
+
       try {
-        // 앱 상태를 AsyncStorage에 저장 (백그라운드 Task가 읽을 수 있도록)
-        await storage.setItem('appState', nextAppState);
+        // 앱 상태를 AsyncStorage에 저장 (타임스탬프 포함)
+        await storage.setAppStateWithTimestamp(nextAppState);
 
-        // inactive 상태는 무시 (잠깐 멈춤일 뿐)
-        if (nextAppState === 'inactive') {
-          appState.current = nextAppState;
-          return;
-        }
+        // ============================================
+        // 🟢 background → active: 전체 복구 필요
+        // ============================================
+        if (appState.current === 'background' && nextAppState === 'active') {
+          console.log('📱 백그라운드에서 포그라운드 복귀');
 
-        // 포그라운드 복귀: inactive 또는 background → active
-        if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-          console.log('📱 앱이 포그라운드로 돌아옴');
-
-          // 백그라운드 Service는 계속 실행 (중지하지 않음)
-
-          // watchPositionAsync 무조건 재시작 (포그라운드 복귀 시)
-          console.log(`🔍 watchPositionAsync 이전 상태: ${locationSubscription.current ? '실행 중' : '중지됨'}`);
-
-          try {
-            // 기존 구독이 있으면 먼저 정리
-            if (locationSubscription.current) {
-              console.log('🔄 기존 watchPositionAsync 중지...');
-              try {
-                locationSubscription.current.remove();
-              } catch (removeError) {
-                console.warn('⚠️ 기존 구독 제거 실패 (무시):', removeError);
-              }
-              locationSubscription.current = null;
+          // 네이티브 백그라운드 위치 추적 중지 (포그라운드 전용 동작 유지)
+          if (Global.USER_ROLE === 'user') {
+            try {
+              await stopNativeBackgroundLocation();
+              console.log('⏹️ 네이티브 백그라운드 위치 추적 중지');
+            } catch (error) {
+              console.warn('⚠️ 네이티브 백그라운드 위치 중지 실패:', error);
             }
-
-            // 새로 시작
-            console.log('🔄 watchPositionAsync 새로 시작...');
-            const sub = await Location.watchPositionAsync(
-              {
-                accuracy: Location.Accuracy.High,
-                timeInterval: 2000,
-                distanceInterval: 10,
-              },
-              handleLocationUpdate // 공통 핸들러 사용
-            );
-            locationSubscription.current = sub;
-            console.log('✅ 포그라운드 watchPositionAsync 시작 완료');
-          } catch (error) {
-            console.error('❌ watchPositionAsync 시작 실패:', error);
           }
 
-          // WebSocket 재연결 (연결되어 있지 않을 때만)
+          // 1. watchPositionAsync 재시작 (재시도 로직 포함)
+          console.log('🔄 watchPositionAsync 재시작 중...');
+          const watchStarted = await startWatchPositionWithRetry(3);
+          if (!watchStarted) {
+            console.error('❌ watchPositionAsync 시작 실패 - 위치 추적이 작동하지 않을 수 있음');
+          }
+
+          // 2. WebSocket 재연결 (필요 시)
           if (Global.NUMBER) {
             const isConnected = websocketService.isConnected();
             console.log(`🔍 WebSocket 연결 상태: ${isConnected ? '연결됨' : '끊어짐'}`);
@@ -598,77 +718,120 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
             if (!isConnected) {
               console.log('🔄 WebSocket 재연결 시도 (포그라운드 복귀)');
               try {
+                await websocketService.disconnect();
                 connectWebSocket();
               } catch (error) {
                 console.error('❌ WebSocket 재연결 실패:', error);
               }
-            } else {
-              console.log('ℹ️ WebSocket이 이미 연결되어 있으므로 재연결 생략');
             }
           }
 
-          // 위치 전송 setInterval 재시작 (이용자만)
-          if (Global.USER_ROLE === 'user' && isTracking) {
-            // 기존 interval이 있으면 정리
+          // 3. 위치 전송 interval 재시작 (이용자만)
+          // ⚠️ isTrackingRef.current 사용 (stale closure 방지)
+          if (Global.USER_ROLE === 'user' && isTrackingRef.current) {
+            // 기존 interval 정리
             if (websocketSendInterval.current) {
               clearInterval(websocketSendInterval.current);
               websocketSendInterval.current = null;
             }
 
-            // 즉시 한 번 전송
+            // sendNow 함수 정의
             const sendNow = async () => {
               const location = currentLocationRef.current;
               if (!location) return;
 
-              console.log('📡 포그라운드: 위치 전송 시도');
+              // ⚠️ 포그라운드 상태 갱신 (백그라운드 Task와 중복 방지)
+              await storage.setAppStateWithTimestamp('active');
+
+              let batteryLevel: number | undefined;
+              try {
+                const level = await Battery.getBatteryLevelAsync();
+                batteryLevel = Math.round(level * 100);
+              } catch (error) {
+                batteryLevel = undefined;
+              }
+
               const result = await sendLocationUpdate({
                 latitude: location.latitude,
                 longitude: location.longitude,
                 timestamp: location.timestamp,
+                batteryLevel,
               });
               if (!result.ok) {
                 console.warn('⚠️ 포그라운드 위치 전송 실패:', result.reason);
               }
             };
 
+            // 즉시 한 번 전송 + 2초 interval 시작
             sendNow();
-
-            // 2초마다 전송
-            websocketSendInterval.current = setInterval(() => {
-              sendNow();
-            }, 2000);
-
+            websocketSendInterval.current = setInterval(sendNow, 2000);
             console.log('✅ 포그라운드 위치 전송 재개 (2초 주기)');
           }
+        }
+        // ============================================
+        // 🟡 inactive → active: 최소한의 처리
+        // (전화, 시스템 팝업 등에서 복귀)
+        // ============================================
+        else if (appState.current === 'inactive' && nextAppState === 'active') {
+          console.log('📱 inactive에서 active로 복귀 (경미한 전환)');
 
-        } else if (appState.current === 'active' && nextAppState === 'background') {
-          // 진짜 백그라운드 전환: active → background (inactive는 무시)
-          console.log('📱 앱이 background 상태로 전환');
+          // WebSocket 연결 상태만 확인 (watchPositionAsync는 건드리지 않음)
+          if (Global.NUMBER && !websocketService.isConnected()) {
+            console.log('🔄 WebSocket 재연결 시도 (inactive 복귀)');
+            connectWebSocket();
+          }
 
-          // 포그라운드 setInterval 중지
+          // ⚠️ watchPositionAsync와 interval은 건드리지 않음
+          // inactive에서는 계속 작동 중일 가능성이 높음
+        }
+        // ============================================
+        // 🔴 active/inactive → background: 정리
+        // ============================================
+        else if (nextAppState === 'background' && appState.current !== 'background') {
+          console.log(`📱 앱이 background 상태로 전환 (이전: ${appState.current})`);
+
+          // 포그라운드 interval 중지
           if (websocketSendInterval.current) {
             clearInterval(websocketSendInterval.current);
             websocketSendInterval.current = null;
             console.log('⏸️ 포그라운드 위치 전송 중지');
           }
 
-          // watchPositionAsync 중지 (백그라운드에서는 어차피 작동 안 함)
+          // watchPositionAsync 중지
           if (locationSubscription.current) {
             try {
               locationSubscription.current.remove();
-              locationSubscription.current = null;
-              console.log('⏸️ watchPositionAsync 중지 (백그라운드에서 자동 멈춤)');
             } catch (error) {
-              console.warn('⚠️ watchPositionAsync 중지 실패 (무시):', error);
+              // 무시
             }
+            locationSubscription.current = null;
+            console.log('⏸️ watchPositionAsync 중지');
           }
 
-          // 백그라운드 Service는 이미 실행 중 (아무것도 안 함)
-          console.log('ℹ️ 백그라운드 위치 서비스는 계속 실행 중');
+          // 네이티브 백그라운드 위치 추적 시작 (이용자만)
+          if (Global.USER_ROLE === 'user') {
+            try {
+              const apiKey = await storage.getApiKey();
+              if (apiKey && Global.NUMBER) {
+                await startNativeBackgroundLocation({
+                  baseUrl: Global.URL,
+                  apiKey,
+                  userNumber: Global.NUMBER,
+                });
+                console.log('✅ 네이티브 백그라운드 위치 추적 시작');
+              } else {
+                console.warn('⚠️ 백그라운드 위치 시작 실패: apiKey/userNumber 없음');
+              }
+            } catch (error) {
+              console.warn('⚠️ 네이티브 백그라운드 위치 시작 실패:', error);
+            }
+          }
         }
       } catch (error) {
         console.error('❌ AppState 변경 처리 중 오류:', error);
       } finally {
+        // 🔓 전환 락 해제 (반드시 실행)
+        isTransitioningRef.current = false;
         appState.current = nextAppState;
       }
     });
@@ -690,8 +853,11 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
       const location = currentLocationRef.current;
       if (!location) return;
 
+      console.log(`🔍 [포그라운드] 지오펜스 체크 시작`);
+
       // AsyncStorage에서 현재 상태 읽기 (백그라운드와 동기화)
       const entryState = await storage.getGeofenceEntryState();
+      console.log(`🔍 [포그라운드] 현재 진입 상태: ${JSON.stringify(entryState)}`);
 
       // 유틸리티 함수 호출
       const result = checkGeofenceEntry(
@@ -701,22 +867,12 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
         entryState
       );
 
-      // 진입 처리
-      for (const entry of result.entries) {
-        // ⚠️ 중요: API 호출 전에 먼저 entryState 저장 (race condition 방지)
-        entryState[entry.geofenceId] = true;
-        await storage.setGeofenceEntryState(entryState);
-        setLastGeofenceCheck({ ...entryState });
-        lastGeofenceCheckRef.current = entryState;
+      console.log(`🔍 [포그라운드] 체크 결과: 진입=${result.entries.length}개, 이탈=${result.exits.length}개`);
 
-        try {
-          await geofenceService.recordEntry({ geofenceId: entry.geofenceId });
-          console.log(`✅ 지오펜스 진입 기록: ${entry.name}`);
-        } catch (error) {
-          // 일시형 지오펜스가 이미 삭제되었거나 중복 요청인 경우
-          console.warn(`⚠️ 지오펜스 진입 기록 실패 (이미 처리됨): ${entry.name}`, error);
-        }
-      }
+      // 진입 처리 (락 + 실패 시 재시도)
+      await processGeofenceEntries(result.entries, entryState, 'foreground');
+      setLastGeofenceCheck({ ...entryState });
+      lastGeofenceCheckRef.current = entryState;
 
       // 이탈 처리 (영구 지오펜스만)
       for (const exit of result.exits) {
@@ -751,8 +907,8 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
     let notificationListeners: any = null;
 
     const initNotifications = async () => {
-      // 초기 앱 상태 저장 (백그라운드 Task가 읽을 수 있도록)
-      await storage.setItem('appState', AppState.currentState);
+      // 초기 앱 상태 저장 (타임스탬프 포함 - 백그라운드 Task 동기화용)
+      await storage.setAppStateWithTimestamp(AppState.currentState);
 
       // 알림 리스너만 설정 (토큰 발급은 로그인 시 처리)
       notificationListeners = setupNotificationListeners();
@@ -768,6 +924,56 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
   }, []);
 
   /**
+   * 일일 이동거리 초기 로드 (로컬 + 서버)
+   */
+  useEffect(() => {
+    const loadTodayDistance = async () => {
+      // 로컬 스토리지에서 먼저 로드 (빠른 표시용)
+      if (Global.USER_ROLE === 'user') {
+        try {
+          const today = new Date().toISOString().split('T')[0];
+          const data = await storage.getDailyDistance(today);
+          if (data && data.date === today) {
+            setDailyDistance(data.distance);
+            dailyDistanceRef.current = data.distance;
+            console.log(`📊 로컬 이동 거리 로드: ${(data.distance / 1000).toFixed(2)} km`);
+          }
+        } catch (error) {
+          console.error('❌ 로컬 이동거리 로드 실패:', error);
+        }
+      }
+
+      // 서버 API에서 정확한 도보 거리 조회
+      if (Global.NUMBER) {
+        fetchDailyDistance();
+      }
+    };
+
+    loadTodayDistance();
+  }, [fetchDailyDistance]);
+
+  /**
+   * 자정 리셋 체크
+   */
+  useEffect(() => {
+    if (Global.USER_ROLE !== 'user') return;
+
+    const checkMidnight = setInterval(() => {
+      const now = new Date();
+      if (now.getHours() === 0 && now.getMinutes() === 0) {
+        console.log('🌙 자정: 일일 이동 거리 초기화');
+        setDailyDistance(0);
+        dailyDistanceRef.current = 0;
+        setDailyDistanceKm(0);
+        // 새 날짜 데이터를 서버에서 가져옴
+        fetchDailyDistance();
+      }
+    }, 60000); // 1분마다 체크
+
+    return () => clearInterval(checkMidnight);
+  }, [fetchDailyDistance]);
+
+  /**
    * 컴포넌트 언마운트 시 정리
    */
   useEffect(() => {
@@ -775,15 +981,6 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
       stopTracking();
       if (websocketSendInterval.current) {
         clearInterval(websocketSendInterval.current);
-      }
-      // Accelerometer 정리
-      if (stopTimeout.current) {
-        clearTimeout(stopTimeout.current);
-        stopTimeout.current = null;
-      }
-      if (accelerometerSubscription.current) {
-        accelerometerSubscription.current.remove();
-        accelerometerSubscription.current = null;
       }
       // WebSocket은 앱 종료 시에만 해제 (페이지 전환 시 유지)
     };
@@ -799,11 +996,16 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
     targetLocation,
     geofences,
     loadGeofences,
+    dailyDistance,
+    dailyDistanceKm,
+    targetDailyDistanceKm,
+    dailyDistanceLoading,
     startTracking,
     stopTracking,
     connectWebSocket,
     disconnectWebSocket,
     setSupporterTarget,
+    fetchDailyDistance,
   };
 
   return <LocationContext.Provider value={value}>{children}</LocationContext.Provider>;

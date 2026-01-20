@@ -7,14 +7,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, BackHandler, ScrollView, StatusBar, Text, ToastAndroid, TouchableOpacity, View } from 'react-native';
+import { Alert, BackHandler, ScrollView, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DailyDistanceCard from '../components/common/DailyDistanceCard';
 import MedicineManager from '../components/senior/MedicineManager';
 import TopHeader from '../components/senior/TopHeader';
 
 export default function UserMainPage() {
     const router = useRouter();
-    const { isWebSocketConnected, isTracking, startTracking } = useLocation();
+    const { isWebSocketConnected, isTracking, startTracking, dailyDistanceKm, dailyDistanceLoading, fetchDailyDistance } = useLocation();
     const [userName, setUserName] = useState('');
     const [isMedicineManagerVisible, setIsMedicineManagerVisible] = useState(false);
 
@@ -23,14 +24,13 @@ export default function UserMainPage() {
         medications,
         loading: medicationsLoading,
         checkMedication,
-        uncheckMedication,
         fetchMedications,
     } = useMedicationManagement();
 
-    // 배터리 모니터링 (5분마다 서버에 자동 업데이트)
+    // 배터리 모니터링 (UI 표시용, 서버 전송은 위치 업데이트와 함께)
     const { batteryLevel, isCharging } = useBattery({
         updateInterval: 5 * 60 * 1000, // 5분
-        autoUpdate: true,
+        autoUpdate: false, // 백그라운드에서 위치와 함께 전송하므로 비활성화
     });
 
     useEffect(() => {
@@ -58,32 +58,34 @@ export default function UserMainPage() {
         }, [])
     );
 
+    // 페이지 진입 시 이동거리 새로고침
+    useFocusEffect(
+        useCallback(() => {
+            console.log('📊 UserMainPage 진입: 이동거리 새로고침');
+            fetchDailyDistance();
+        }, [fetchDailyDistance])
+    );
+
     const loadUserData = async () => {
         const name = await storage.getUserName();
         if (name) setUserName(name);
     };
 
-    const handleAddMedicationRecord = async (medicationId: number) => {
+    const handleAddMedicationRecord = async (medicationId: number, medicationName: string) => {
         try {
             const success = await checkMedication(medicationId);
             if (success) {
-                ToastAndroid.show('복용 기록이 추가되었습니다.', ToastAndroid.SHORT);
+                // medications 상태가 업데이트된 후 해당 약의 checkCount를 가져옴
+                const updatedMedication = medications.find(m => m.id === medicationId);
+                const newCheckCount = (updatedMedication?.checkCount || 0) + 1;
+                Alert.alert(
+                    '💊 복용 완료!',
+                    `${medicationName} 오늘 ${newCheckCount}회 복용하셨습니다!`
+                );
             }
         } catch (error) {
             console.error('복용 기록 추가 실패:', error);
             Alert.alert('오류', '복용 기록 추가에 실패했습니다.');
-        }
-    };
-
-    const handleRemoveMedicationRecord = async (medicationId: number) => {
-        try {
-            const success = await uncheckMedication(medicationId);
-            if (success) {
-                ToastAndroid.show('최근 복용 기록이 삭제되었습니다.', ToastAndroid.SHORT);
-            }
-        } catch (error) {
-            console.error('복용 기록 삭제 실패:', error);
-            Alert.alert('오류', '복용 기록 삭제에 실패했습니다.');
         }
     };
 
@@ -161,27 +163,12 @@ export default function UserMainPage() {
                     />
                 </View>
 
-                {/* 2. 안심 연결 위젯 (중앙 정렬) */}
-                <View
-                    className="mb-6 flex-row items-center px-12"
-                >
-                    <View className={`w-14 h-14 rounded-full items-center justify-center mr-3 ${isWebSocketConnected ? 'bg-green-100' : 'bg-gray-200'
-                        }`}>
-                        <Ionicons
-                            name={isWebSocketConnected ? "shield-checkmark" : "shield-outline"}
-                            size={28}
-                            color={isWebSocketConnected ? "#16a34a" : "#9ca3af"}
-                        />
-                    </View>
-                    <View>
-                        <Text className={`text-lg font-bold ${isWebSocketConnected ? 'text-gray-900' : 'text-gray-500'
-                            }`}>
-                            {isWebSocketConnected ? '보호자와 연결되어 있습니다' : '연결 확인이 필요합니다'}
-                        </Text>
-                        <Text className="text-gray-500 text-sm mt-0.5 font-medium">
-                            {isWebSocketConnected ? '오늘도 건강하고 행복한 하루 되세요' : '인터넷 연결을 확인해주세요'}
-                        </Text>
-                    </View>
+                {/* 2. 일일 이동거리 위젯 */}
+                <View className="mb-6">
+                    <DailyDistanceCard
+                        distanceKm={dailyDistanceKm}
+                        loading={dailyDistanceLoading}
+                    />
                 </View>
 
                 {/* 3. 메인 메뉴 그리드 */}
@@ -282,24 +269,13 @@ export default function UserMainPage() {
                                                 )}
                                             </View>
 
-                                            <View className="flex-row gap-2 ml-3">
-                                                <TouchableOpacity
-                                                    onPress={() => handleAddMedicationRecord(medication.id)}
-                                                    activeOpacity={0.7}
-                                                    className="bg-blue-600 w-12 h-12 rounded-full items-center justify-center"
-                                                >
-                                                    <Ionicons name="add" size={24} color="#ffffff" />
-                                                </TouchableOpacity>
-                                                {checkCount > 0 && (
-                                                    <TouchableOpacity
-                                                        onPress={() => handleRemoveMedicationRecord(medication.id)}
-                                                        activeOpacity={0.7}
-                                                        className="bg-red-100 w-12 h-12 rounded-full items-center justify-center"
-                                                    >
-                                                        <Ionicons name="remove" size={24} color="#ef4444" />
-                                                    </TouchableOpacity>
-                                                )}
-                                            </View>
+                                            <TouchableOpacity
+                                                onPress={() => handleAddMedicationRecord(medication.id, medication.name)}
+                                                activeOpacity={0.7}
+                                                className="bg-blue-600 w-16 h-16 rounded-full items-center justify-center ml-3"
+                                            >
+                                                <Ionicons name="add" size={32} color="#ffffff" />
+                                            </TouchableOpacity>
                                         </View>
                                     </View>
                                 );

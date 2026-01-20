@@ -12,7 +12,7 @@ export const useLoginLogic = () => {
     const router = useRouter();
     const { disconnectWebSocket, connectWebSocket } = useLocation();
     const [number, setNumber] = useState('');
-    const [password, setPassword] = useState('');
+    const [password, setPassword] = useState('111');
     const [isLoading, setIsLoading] = useState(false);
     const [autoLogin, setAutoLogin] = useState(true);
     const [isCheckingAutoLogin, setIsCheckingAutoLogin] = useState(true);
@@ -21,11 +21,11 @@ export const useLoginLogic = () => {
     useEffect(() => {
         const checkAutoLogin = async () => {
             try {
-                const [savedAutoLogin, apiKey, userRole] = await Promise.all([
-                    storage.getAutoLogin(),
-                    storage.getApiKey(),
-                    storage.getUserRole(),
-                ]);
+                    const [savedAutoLogin, apiKey, userRole] = await Promise.all([
+                        storage.getAutoLogin(),
+                        storage.getApiKey(),
+                        storage.getUserRole(),
+                    ]);
 
                 setAutoLogin(savedAutoLogin);
 
@@ -36,6 +36,7 @@ export const useLoginLogic = () => {
                     // FCM 토큰 갱신
                     await initializeNotifications();
 
+                    Global.API_KEY = apiKey;
                     if (userRole === 'user') {
                         // 자동 로그인 시에는 startTracking()을 호출하지 않음
                         // UserMainPage에서 useEffect로 자동 시작됨
@@ -77,6 +78,7 @@ export const useLoginLogic = () => {
             console.log('로그인 성공:', response);
 
             Global.NUMBER = response.number;
+            Global.API_KEY = response.apiKey;
 
             await storage.setLoginInfo(response.apiKey, response.number, response.name);
             await storage.setAutoLogin(autoLogin); // 자동 로그인 설정 저장

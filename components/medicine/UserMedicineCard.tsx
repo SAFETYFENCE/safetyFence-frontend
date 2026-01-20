@@ -59,42 +59,51 @@ const UserMedicineCard: React.FC<UserMedicineCardProps> = ({ item }) => {
                         {item.medicines.map((medicine) => (
                             <View
                                 key={medicine.id}
-                                className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex-row items-start"
+                                className="bg-gray-50 p-4 rounded-xl border border-gray-100"
                             >
-                                <View className={`h-10 w-10 rounded-lg items-center justify-center mr-3 ${medicine.checkedToday ? 'bg-green-100' : 'bg-white border border-gray-200'}`}>
-                                    <Pill size={18} color={medicine.checkedToday ? '#15803d' : '#64748b'} />
-                                </View>
-                                <View className="flex-1">
-                                    <View className="flex-row justify-between items-start">
-                                        <View>
-                                            <Text className={`text-base font-bold mb-1 ${medicine.checkedToday ? 'text-gray-900' : 'text-gray-700'}`}>
-                                                {medicine.name}
-                                            </Text>
-                                            <View className="flex-row flex-wrap gap-2">
-                                                {medicine.dosage && medicine.dosage !== '정보 없음' && (
-                                                    <Text className="text-xs text-gray-500 bg-white px-1.5 py-0.5 rounded border border-gray-200">
-                                                        {medicine.dosage}
-                                                    </Text>
-                                                )}
-                                                {medicine.purpose && medicine.purpose !== '정보 없음' && (
-                                                    <Text className="text-xs text-gray-500 bg-white px-1.5 py-0.5 rounded border border-gray-200">
-                                                        {medicine.purpose}
-                                                    </Text>
-                                                )}
-                                            </View>
-                                        </View>
+                                {/* 상세 정보 유무 확인 */}
+                                {(() => {
+                                    const hasDetails = (medicine.dosage && medicine.dosage !== '정보 없음') || (medicine.purpose && medicine.purpose !== '정보 없음');
 
-                                        {medicine.checkedToday ? (
-                                            <View className="bg-green-500 px-2.5 py-1 rounded-lg shadow-sm">
-                                                <Text className="text-white text-xs font-bold">복용함</Text>
+                                    return (
+                                        <>
+                                            <View className={`flex-row items-center ${hasDetails ? 'mb-3' : ''}`}>
+                                                <View className={`h-10 w-10 rounded-lg items-center justify-center mr-3 flex-shrink-0 ${medicine.checkCount && medicine.checkCount > 0 ? 'bg-green-100' : 'bg-white border border-gray-200'}`}>
+                                                    <Pill size={18} color={medicine.checkCount && medicine.checkCount > 0 ? '#15803d' : '#64748b'} />
+                                                </View>
+                                                <View className="flex-1">
+                                                    <Text className={`text-base font-bold ${medicine.checkCount && medicine.checkCount > 0 ? 'text-gray-900' : 'text-gray-700'}`}>
+                                                        {medicine.name}
+                                                    </Text>
+                                                </View>
+                                                {medicine.checkCount && medicine.checkCount > 0 ? (
+                                                    <View className="bg-green-500 px-2.5 py-1 rounded-lg shadow-sm flex-shrink-0">
+                                                        <Text className="text-white text-xs font-bold">{medicine.checkCount}회 복용</Text>
+                                                    </View>
+                                                ) : (
+                                                    <View className="bg-gray-200 px-2.5 py-1 rounded-lg flex-shrink-0">
+                                                        <Text className="text-gray-500 text-xs font-bold">미복용</Text>
+                                                    </View>
+                                                )}
                                             </View>
-                                        ) : (
-                                            <View className="bg-gray-200 px-2.5 py-1 rounded-lg">
-                                                <Text className="text-gray-500 text-xs font-bold">미복용</Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                </View>
+
+                                            {hasDetails && (
+                                                <View className="flex-row flex-wrap gap-2 ml-13 items-start">
+                                                    {medicine.dosage && medicine.dosage !== '정보 없음' && (
+                                                        <Text className="text-xs text-gray-500 bg-white px-1.5 py-0.5 rounded border border-gray-200">
+                                                            {medicine.dosage}
+                                                        </Text>
+                                                    )}
+                                                    {medicine.purpose && medicine.purpose !== '정보 없음' && (
+                                                        <Text className="text-xs text-gray-500 bg-white px-1.5 py-0.5 rounded border border-gray-200">
+                                                            {medicine.purpose}
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                            )}
+                                        </>
+                                    );
+                                })()}
                             </View>
                         ))}
                     </View>
