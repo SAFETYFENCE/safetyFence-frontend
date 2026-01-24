@@ -375,6 +375,23 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
           console.warn('⚠️ 백그라운드 지오펜스 Task 등록 중 오류:', error);
         }
 
+        // ✅ 네이티브 백그라운드 위치 서비스 시작 (포그라운드에서 미리 시작 - Android 14+ 필수)
+        try {
+          const apiKey = await storage.getApiKey();
+          if (apiKey && Global.NUMBER) {
+            await startNativeBackgroundLocation({
+              baseUrl: Global.URL,
+              apiKey,
+              userNumber: Global.NUMBER,
+            });
+            console.log('✅ 네이티브 백그라운드 위치 서비스 시작 (포그라운드)');
+          } else {
+            console.warn('⚠️ 백그라운드 위치 서비스 시작 실패: apiKey/userNumber 없음');
+          }
+        } catch (error) {
+          console.warn('⚠️ 네이티브 백그라운드 위치 서비스 시작 실패:', error);
+        }
+
         // 배터리 최적화 안내 (Android, 최초 1회)
         checkAndRequestBatteryOptimization();
       }
@@ -693,15 +710,9 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
         if (appState.current === 'background' && nextAppState === 'active') {
           console.log('📱 백그라운드에서 포그라운드 복귀');
 
-          // 네이티브 백그라운드 위치 추적 중지 (포그라운드 전용 동작 유지)
-          if (Global.USER_ROLE === 'user') {
-            try {
-              await stopNativeBackgroundLocation();
-              console.log('⏹️ 네이티브 백그라운드 위치 추적 중지');
-            } catch (error) {
-              console.warn('⚠️ 네이티브 백그라운드 위치 중지 실패:', error);
-            }
-          }
+          // ✅ FGS는 계속 실행 유지 (Android 14+ 필수)
+          // 포그라운드에서 중지하면 다시 백그라운드 갈 때 시작 불가
+          console.log('📱 FGS 계속 실행 유지 (stopTracking 시에만 중지)');
 
           // 1. watchPositionAsync 재시작 (재시도 로직 포함)
           console.log('🔄 watchPositionAsync 재시작 중...');
@@ -808,24 +819,9 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
             console.log('⏸️ watchPositionAsync 중지');
           }
 
-          // 네이티브 백그라운드 위치 추적 시작 (이용자만)
-          if (Global.USER_ROLE === 'user') {
-            try {
-              const apiKey = await storage.getApiKey();
-              if (apiKey && Global.NUMBER) {
-                await startNativeBackgroundLocation({
-                  baseUrl: Global.URL,
-                  apiKey,
-                  userNumber: Global.NUMBER,
-                });
-                console.log('✅ 네이티브 백그라운드 위치 추적 시작');
-              } else {
-                console.warn('⚠️ 백그라운드 위치 시작 실패: apiKey/userNumber 없음');
-              }
-            } catch (error) {
-              console.warn('⚠️ 네이티브 백그라운드 위치 시작 실패:', error);
-            }
-          }
+          // ✅ FGS는 startTracking()에서 이미 시작됨 (Android 14+ 필수)
+          // 백그라운드 진입 시 별도 시작 불필요 - 이미 실행 중
+          console.log('📱 백그라운드 진입: FGS 이미 실행 중 (포그라운드에서 시작됨)');
         }
       } catch (error) {
         console.error('❌ AppState 변경 처리 중 오류:', error);
