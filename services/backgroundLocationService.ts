@@ -7,9 +7,12 @@
 
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
+import * as Battery from 'expo-battery';
+import { Platform } from 'react-native';
 import { storage } from '../utils/storage';
 import { checkGeofenceEntry } from '../utils/geofenceUtils';
 import { processGeofenceEntries } from './geofenceEntryService';
+import { sendLocationUpdate } from './locationTransport';
 
 // 백그라운드 위치 작업 이름
 export const BACKGROUND_LOCATION_TASK = 'background-location-task';
@@ -134,8 +137,38 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }: any) =>
       return;
     }
 
-    // ⚠️ 백그라운드 위치 전송은 네이티브 서비스가 담당
-    // 여기서는 지오펜스 체크만 수행
+    // ✅ iOS: Expo Task가 위치 전송 + 지오펜스 체크 모두 담당
+    // ✅ Android: 네이티브 FGS가 위치 전송 담당, 여기서는 지오펜스 체크만
+    if (Platform.OS === 'ios') {
+      // iOS 백그라운드 위치 전송
+      try {
+        let batteryLevel: number | undefined;
+        try {
+          const level = await Battery.getBatteryLevelAsync();
+          batteryLevel = Math.round(level * 100);
+        } catch {
+          batteryLevel = undefined;
+        }
+
+        console.log(`📡 [iOS 백그라운드] 위치 전송 시도`);
+        const result = await sendLocationUpdate({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          timestamp: location.timestamp,
+          batteryLevel,
+        });
+
+        if (!result.ok) {
+          console.warn('⚠️ [iOS 백그라운드] 위치 전송 실패:', result.reason);
+        } else {
+          console.log('✅ [iOS 백그라운드] 위치 전송 성공');
+        }
+      } catch (sendError) {
+        console.error('❌ [iOS 백그라운드] 위치 전송 오류:', sendError);
+      }
+    }
+
+    // 지오펜스 체크 (iOS/Android 모두)
     await checkBackgroundGeofenceEntry(
       location.coords.latitude,
       location.coords.longitude

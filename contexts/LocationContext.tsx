@@ -22,7 +22,7 @@ import Global from '@/constants/Global';
 import * as Location from 'expo-location';
 import * as Battery from 'expo-battery';
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Alert, AppState, AppStateStatus, Linking } from 'react-native';
+import { Alert, AppState, AppStateStatus, Linking, Platform } from 'react-native';
 import { startNativeBackgroundLocation, stopNativeBackgroundLocation } from '../services/nativeBackgroundLocation';
 import { checkAndRequestBatteryOptimization } from '../utils/batteryOptimization';
 import { geofenceService } from '../services/geofenceService';
@@ -361,39 +361,55 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
       setError(null);
       setIsLoading(false);
 
-      // 백그라운드 지오펜스 체크용 Task 등록 (포그라운드에서만 가능)
+      // 백그라운드 위치/지오펜스 처리
       if (Global.USER_ROLE === 'user') {
-        try {
-          const { startBackgroundLocationTracking } = await import('../services/backgroundLocationService');
-          const started = await startBackgroundLocationTracking();
-          if (started) {
-            console.log('✅ 백그라운드 지오펜스 Task 등록 완료');
-          } else {
-            console.warn('⚠️ 백그라운드 지오펜스 Task 등록 실패 (권한/제한)');
-          }
-        } catch (error) {
-          console.warn('⚠️ 백그라운드 지오펜스 Task 등록 중 오류:', error);
-        }
+        if (Platform.OS === 'android') {
+          // ✅ Android: 네이티브 FGS가 위치 전송 + 지오펜스 체크 모두 담당
+          try {
+            const apiKey = await storage.getApiKey();
+            if (apiKey && Global.NUMBER) {
+              // 지오펜스 캐시 가져오기
+              let geofenceCacheStr: string | undefined;
+              try {
+                const cache = await storage.getGeofenceCache();
+                if (cache) {
+                  geofenceCacheStr = JSON.stringify(cache);
+                  console.log(`📍 지오펜스 캐시 로드: ${cache.data.length}개`);
+                }
+              } catch (e) {
+                console.warn('⚠️ 지오펜스 캐시 로드 실패:', e);
+              }
 
-        // ✅ 네이티브 백그라운드 위치 서비스 시작 (포그라운드에서 미리 시작 - Android 14+ 필수)
-        try {
-          const apiKey = await storage.getApiKey();
-          if (apiKey && Global.NUMBER) {
-            await startNativeBackgroundLocation({
-              baseUrl: Global.URL,
-              apiKey,
-              userNumber: Global.NUMBER,
-            });
-            console.log('✅ 네이티브 백그라운드 위치 서비스 시작 (포그라운드)');
-          } else {
-            console.warn('⚠️ 백그라운드 위치 서비스 시작 실패: apiKey/userNumber 없음');
+              await startNativeBackgroundLocation({
+                baseUrl: Global.URL,
+                apiKey,
+                userNumber: Global.NUMBER,
+                geofenceCache: geofenceCacheStr,
+              });
+              console.log('✅ [Android] 네이티브 백그라운드 서비스 시작 (위치 전송 + 지오펜스)');
+            } else {
+              console.warn('⚠️ 백그라운드 위치 서비스 시작 실패: apiKey/userNumber 없음');
+            }
+          } catch (error) {
+            console.warn('⚠️ 네이티브 백그라운드 위치 서비스 시작 실패:', error);
           }
-        } catch (error) {
-          console.warn('⚠️ 네이티브 백그라운드 위치 서비스 시작 실패:', error);
-        }
 
-        // 배터리 최적화 안내 (Android, 최초 1회)
-        checkAndRequestBatteryOptimization();
+          // 배터리 최적화 안내 (Android, 최초 1회)
+          checkAndRequestBatteryOptimization();
+        } else {
+          // ✅ iOS: Expo Task로 지오펜스 체크 (네이티브 FGS 없음)
+          try {
+            const { startBackgroundLocationTracking } = await import('../services/backgroundLocationService');
+            const started = await startBackgroundLocationTracking();
+            if (started) {
+              console.log('✅ [iOS] Expo 백그라운드 Task 등록 완료');
+            } else {
+              console.warn('⚠️ [iOS] 백그라운드 Task 등록 실패');
+            }
+          } catch (error) {
+            console.warn('⚠️ [iOS] 백그라운드 Task 등록 중 오류:', error);
+          }
+        }
       }
 
       console.log('✅ 위치 추적 시작 완료');
@@ -415,9 +431,20 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
       console.log('📍 위치 추적 중지');
     }
 
-    // 네이티브 백그라운드 위치 추적 중지
-    await stopNativeBackgroundLocation();
-
+    if (Platform.OS === 'android') {
+      // Android: 네이티브 FGS 중지
+      await stopNativeBackgroundLocation();
+      console.log('✅ [Android] 네이티브 FGS 중지');
+    } else {
+      // iOS: Expo 백그라운드 Task 중지
+      try {
+        const { stopBackgroundLocationTracking } = await import('../services/backgroundLocationService');
+        await stopBackgroundLocationTracking();
+        console.log('✅ [iOS] Expo 백그라운드 Task 중지');
+      } catch (error) {
+        console.warn('⚠️ [iOS] Expo Task 중지 실패:', error);
+      }
+    }
   };
 
   const subscribeToSupporterTarget = (targetNumber: string) => {
@@ -536,6 +563,18 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
       // 백그라운드를 위한 캐시 저장 (이용자만)
       if (Global.USER_ROLE === 'user') {
         await storage.setGeofenceCache(data);
+
+        // Android: 네이티브 서비스 캐시도 업데이트
+        if (Platform.OS === 'android') {
+          try {
+            const { updateNativeGeofenceCache } = await import('../services/nativeBackgroundLocation');
+            const cacheObj = { data, timestamp: Date.now() };
+            await updateNativeGeofenceCache(JSON.stringify(cacheObj));
+            console.log('✅ [Android] 네이티브 지오펜스 캐시 업데이트 완료');
+          } catch (e) {
+            console.warn('⚠️ [Android] 네이티브 지오펜스 캐시 업데이트 실패:', e);
+          }
+        }
       }
 
       console.log(`✅ 지오펜스 목록 로드 성공: ${data.length}개 (${Global.USER_ROLE === 'supporter' ? `이용자: ${targetNumber}` : '본인'})`);
@@ -838,7 +877,10 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
   }, [isWebSocketConnected]);
 
   /**
-   * 지오펜스 진입 감지 (user role만, 항상 실행)
+   * 지오펜스 진입 감지 (user role만, 포그라운드에서만 실행)
+   *
+   * ⚠️ Android 백그라운드에서는 Kotlin FGS가 지오펜스 체크를 담당
+   * ⚠️ iOS 백그라운드에서는 Expo Task가 지오펜스 체크를 담당
    */
   useEffect(() => {
     if (Global.USER_ROLE !== 'user' || geofences.length === 0) {
@@ -846,12 +888,25 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
     }
 
     const checkAndRecordGeofenceEntry = async () => {
+      // ⚠️ 백그라운드 상태면 체크하지 않음 (각 플랫폼의 백그라운드 서비스가 담당)
+      if (appState.current !== 'active') {
+        console.log('ℹ️ [지오펜스] 백그라운드 상태 - JS 체크 스킵 (네이티브 서비스가 담당)');
+        return;
+      }
+
       const location = currentLocationRef.current;
       if (!location) return;
 
+      // 위치 데이터가 너무 오래된 경우 스킵 (30초 이상)
+      const locationAge = Date.now() - location.timestamp;
+      if (locationAge > 30000) {
+        console.log(`ℹ️ [지오펜스] 위치 데이터가 오래됨 (${Math.round(locationAge / 1000)}초) - 스킵`);
+        return;
+      }
+
       console.log(`🔍 [포그라운드] 지오펜스 체크 시작`);
 
-      // AsyncStorage에서 현재 상태 읽기 (백그라운드와 동기화)
+      // SharedPreferences에서 현재 상태 읽기 (Android: Kotlin과 동기화)
       const entryState = await storage.getGeofenceEntryState();
       console.log(`🔍 [포그라운드] 현재 진입 상태: ${JSON.stringify(entryState)}`);
 
@@ -880,7 +935,7 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
       }
     };
 
-    // 10초마다 지오펜스 검사
+    // 10초마다 지오펜스 검사 (포그라운드에서만 실제 체크 수행)
     const geofenceCheckInterval = setInterval(() => {
       checkAndRecordGeofenceEntry();
     }, 10000);
@@ -888,7 +943,7 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
     // 초기 검사 (즉시 실행)
     checkAndRecordGeofenceEntry();
 
-    console.log('🔍 지오펜스 검사 시작 (10초 주기, 항상 실행)');
+    console.log('🔍 지오펜스 검사 시작 (10초 주기, 포그라운드에서만 실행)');
 
     return () => {
       clearInterval(geofenceCheckInterval);

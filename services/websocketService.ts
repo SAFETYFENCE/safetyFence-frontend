@@ -180,12 +180,14 @@ class WebSocketService {
           }
         },
         onStompError: (frame) => {
-          console.error('❌ STOMP 에러:', frame.headers['message']);
-          console.error('에러 상세:', frame.body);
+          // console.warn 사용 (console.error는 Expo Dev에서 빨간 에러 화면 트리거)
+          console.warn('⚠️ STOMP 에러:', frame.headers['message']);
+          console.warn('에러 상세:', frame.body);
           this.connectionCallback?.(false);
         },
         onWebSocketError: (event) => {
-          console.error('❌ WebSocket 에러:', event);
+          // console.warn 사용 (console.error는 Expo Dev에서 빨간 에러 화면 트리거)
+          console.warn('⚠️ WebSocket 에러:', event?.type || 'unknown');
           this.connectionCallback?.(false);
         },
         onWebSocketClose: (event) => {

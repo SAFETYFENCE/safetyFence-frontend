@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import type { GeofenceItem } from '../types/api';
 
 /**
@@ -213,8 +214,20 @@ export const storage = {
   // ==================== Geofence 관련 ====================
 
   // 지오펜스 진입 상태 가져오기
+  // Android: SharedPreferences (Kotlin과 동기화)
+  // iOS: AsyncStorage
   async getGeofenceEntryState(): Promise<{ [key: number]: boolean }> {
     try {
+      if (Platform.OS === 'android') {
+        // Android: 네이티브 SharedPreferences에서 읽기 (Kotlin과 동기화)
+        const { getNativeEntryState } = await import('../services/nativeBackgroundLocation');
+        const nativeState = await getNativeEntryState();
+        if (nativeState !== null) {
+          console.log(`📖 [Storage/Android] getGeofenceEntryState from native: ${JSON.stringify(nativeState)}`);
+          return nativeState;
+        }
+      }
+      // iOS 또는 네이티브 실패 시: AsyncStorage
       const data = await AsyncStorage.getItem(STORAGE_KEYS.GEOFENCE_ENTRY_STATE);
       const parsed = data ? JSON.parse(data) : {};
       console.log(`📖 [Storage] getGeofenceEntryState: raw="${data}", parsed=${JSON.stringify(parsed)}`);
@@ -226,12 +239,23 @@ export const storage = {
   },
 
   // 지오펜스 진입 상태 저장
+  // Android: SharedPreferences (Kotlin과 동기화)
+  // iOS: AsyncStorage
   async setGeofenceEntryState(state: { [key: number]: boolean }): Promise<void> {
     try {
       const json = JSON.stringify(state);
       console.log(`💾 [Storage] setGeofenceEntryState: ${json}`);
-      await AsyncStorage.setItem(STORAGE_KEYS.GEOFENCE_ENTRY_STATE, json);
-      console.log(`✅ [Storage] setGeofenceEntryState 완료`);
+
+      if (Platform.OS === 'android') {
+        // Android: 네이티브 SharedPreferences에 저장 (Kotlin과 동기화)
+        const { setNativeEntryState } = await import('../services/nativeBackgroundLocation');
+        await setNativeEntryState(state);
+        console.log(`✅ [Storage/Android] setGeofenceEntryState to native 완료`);
+      } else {
+        // iOS: AsyncStorage
+        await AsyncStorage.setItem(STORAGE_KEYS.GEOFENCE_ENTRY_STATE, json);
+        console.log(`✅ [Storage/iOS] setGeofenceEntryState 완료`);
+      }
     } catch (error) {
       console.error('지오펜스 진입 상태 저장 실패:', error);
       throw error;
@@ -442,8 +466,20 @@ export const storage = {
 
   // ==================== 지오펜스 진입 락 ====================
 
+  // Android: SharedPreferences (Kotlin과 동기화)
+  // iOS: AsyncStorage
   async getGeofenceEntryLocks(): Promise<GeofenceEntryLocks> {
     try {
+      if (Platform.OS === 'android') {
+        // Android: 네이티브 SharedPreferences에서 읽기 (Kotlin과 동기화)
+        const { getNativeEntryLocks } = await import('../services/nativeBackgroundLocation');
+        const nativeLocks = await getNativeEntryLocks();
+        if (nativeLocks !== null) {
+          console.log(`📖 [Storage/Android] getGeofenceEntryLocks from native`);
+          return nativeLocks;
+        }
+      }
+      // iOS 또는 네이티브 실패 시: AsyncStorage
       const data = await AsyncStorage.getItem(STORAGE_KEYS.GEOFENCE_ENTRY_LOCKS);
       return data ? JSON.parse(data) : {};
     } catch (error) {
@@ -452,9 +488,19 @@ export const storage = {
     }
   },
 
+  // Android: SharedPreferences (Kotlin과 동기화)
+  // iOS: AsyncStorage
   async setGeofenceEntryLocks(locks: GeofenceEntryLocks): Promise<void> {
     try {
-      await AsyncStorage.setItem(STORAGE_KEYS.GEOFENCE_ENTRY_LOCKS, JSON.stringify(locks));
+      if (Platform.OS === 'android') {
+        // Android: 네이티브 SharedPreferences에 저장 (Kotlin과 동기화)
+        const { setNativeEntryLocks } = await import('../services/nativeBackgroundLocation');
+        await setNativeEntryLocks(locks);
+        console.log(`✅ [Storage/Android] setGeofenceEntryLocks to native 완료`);
+      } else {
+        // iOS: AsyncStorage
+        await AsyncStorage.setItem(STORAGE_KEYS.GEOFENCE_ENTRY_LOCKS, JSON.stringify(locks));
+      }
     } catch (error) {
       console.error('지오펜스 진입 락 저장 실패:', error);
     }
