@@ -72,6 +72,7 @@
       "package": "com.paypass.safetyfence"
     },
     "plugins": [
+      "./plugins/withBackgroundLocation",
       "expo-router",
       [
         "expo-splash-screen",
@@ -96,7 +97,8 @@
         "expo-build-properties",
         {
           "android": {
-            "usesCleartextTraffic": true
+            "usesCleartextTraffic": true,
+            "proguardRules": "-keep class com.paypass.safetyfence.location.** { *; }"
           }
         }
       ],
