@@ -2,6 +2,7 @@ const {
   withMainApplication,
   withDangerousMod,
   withAndroidManifest,
+  withGradleProperties,
 } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
@@ -73,7 +74,25 @@ function withBackgroundLocation(config) {
     return config;
   });
 
-  // 3. 네이티브 모듈 파일 복사 (android/app/src/main/java/...)
+  // 3. Gradle JVM 메모리 증가 (DEX 병합 시 OOM 방지)
+  config = withGradleProperties(config, (config) => {
+    const props = config.modResults;
+
+    // 기존 jvmargs 제거 후 새로 추가
+    const filtered = props.filter(
+      (p) => !(p.type === 'property' && p.key === 'org.gradle.jvmargs')
+    );
+    filtered.push({
+      type: 'property',
+      key: 'org.gradle.jvmargs',
+      value: '-Xmx4096m -XX:MaxMetaspaceSize=1024m',
+    });
+
+    config.modResults = filtered;
+    return config;
+  });
+
+  // 4. 네이티브 모듈 파일 복사 (android/app/src/main/java/...)
   config = withDangerousMod(config, [
     'android',
     async (config) => {
