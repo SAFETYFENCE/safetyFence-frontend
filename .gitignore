@@ -38,8 +38,8 @@ yarn-error.*
 
 app-example
 
-android
-ios
+/android
+/ios
 
 # google-services.json은 Git에 포함 (EAS Build 필요)
 # google-services.json
