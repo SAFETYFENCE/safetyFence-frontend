@@ -42,8 +42,9 @@ class BackgroundLocationService : Service() {
         private const val TAG = "BgLocationService"
         private const val NOTIFICATION_ID = 3001
         private const val GEOFENCE_NOTIFICATION_ID = 3002
-        private const val GEOFENCE_RADIUS_METERS = 100.0
-        private const val ENTRY_LOCK_TTL_MS = 30_000L
+        private const val ENTER_RADIUS_METERS = 100.0  // 진입 반경
+        private const val EXIT_RADIUS_METERS = 150.0   // 이탈 반경 (히스테리시스)
+        private const val ENTRY_LOCK_TTL_MS = 300_000L // 5분 (중복 진입 방지)
         const val ACTION_START = "com.paypass.safetyfence.BG_LOCATION_START"
         const val ACTION_STOP = "com.paypass.safetyfence.BG_LOCATION_STOP"
     }
@@ -319,20 +320,22 @@ class BackgroundLocationService : Service() {
 
             // 1. 거리 체크
             val distance = calculateDistance(lat, lng, fenceLat, fenceLng)
-            val isInside = distance <= GEOFENCE_RADIUS_METERS
+            val wasInside = entryState[id] == true
 
             // 2. 시간 체크 (일시적 지오펜스만)
             val isTimeActive = type == 0 || isWithinTimeRange(startTime, endTime)
 
-            // 3. 진입 조건
-            val canEnter = isInside && isTimeActive
-            val wasInside = entryState[id] == true
+            // 3. 히스테리시스: 진입 100m, 이탈 150m (GPS 흔들림 방지)
+            val isInsideForEntry = distance <= ENTER_RADIUS_METERS
+            val isInsideForExit = distance <= EXIT_RADIUS_METERS
+            val canEnter = isInsideForEntry && isTimeActive
+            val stillInside = isInsideForExit && isTimeActive
 
-            Log.d(TAG, "Fence[$id] $name: distance=${distance.toInt()}m, inside=$isInside, timeActive=$isTimeActive, wasInside=$wasInside")
+            Log.d(TAG, "Fence[$id] $name: distance=${distance.toInt()}m, canEnter=$canEnter, stillInside=$stillInside, wasInside=$wasInside")
 
             // 진입 감지
             if (canEnter && !wasInside) {
-                // 30초 락 체크
+                // 락 체크 (5분간 중복 진입 방지)
                 val lastLock = entryLocks[id] ?: 0
                 if (now - lastLock < ENTRY_LOCK_TTL_MS) {
                     Log.d(TAG, "Fence[$id] entry locked, skipping")
@@ -340,26 +343,30 @@ class BackgroundLocationService : Service() {
                 }
 
                 Log.i(TAG, "🚨 Geofence ENTRY detected: $name")
+
+                // ✅ FIX: 낙관적으로 entryState를 먼저 설정 (async 콜백 전에 상태 저장되도록)
+                entryState[id] = true
+                stateChanged = true
+
                 entryLocks[id] = now
                 locksChanged = true
 
-                // API 호출
+                // API 호출 (실패 시 롤백)
                 recordGeofenceEntry(id, name) { success ->
                     if (success) {
-                        entryState[id] = true
-                        saveEntryState(entryState)
                         Log.i(TAG, "✅ Geofence entry recorded: $name")
                     } else {
-                        // 실패 시 락 해제
+                        // 실패 시 상태 롤백
+                        entryState.remove(id)
                         entryLocks.remove(id)
+                        saveEntryState(entryState)
                         saveEntryLocks(entryLocks)
-                        Log.w(TAG, "❌ Geofence entry failed: $name")
+                        Log.w(TAG, "❌ Geofence entry failed, rolled back: $name")
                     }
                 }
-                stateChanged = true
             }
-            // 이탈 감지 (영구 지오펜스만)
-            else if (type == 0 && !canEnter && wasInside) {
+            // 이탈 감지 (영구 지오펜스만, 150m 밖으로 나가야 이탈)
+            else if (type == 0 && !stillInside && wasInside) {
                 Log.i(TAG, "🚪 Geofence EXIT detected: $name")
                 entryState.remove(id)
                 stateChanged = true

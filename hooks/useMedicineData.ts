@@ -4,6 +4,8 @@ import { Alert } from 'react-native';
 import { medicationService } from '../services/medicationService';
 import type { MedicationItem } from '../types/api';
 
+export type DeleteMedicationFn = (medicationId: number, medicationName: string) => void;
+
 export interface UserMedicineData {
     user: {
         userNumber: string;
@@ -22,6 +24,7 @@ export const useMedicineData = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
 
     const fetchData = useCallback(async () => {
         try {
@@ -70,6 +73,31 @@ export const useMedicineData = () => {
         fetchData();
     };
 
+    const deleteMedication: DeleteMedicationFn = (medicationId: number, medicationName: string) => {
+        Alert.alert(
+            '약 삭제',
+            `"${medicationName}"을(를) 삭제하시겠습니까?`,
+            [
+                { text: '취소', style: 'cancel' },
+                {
+                    text: '삭제',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await medicationService.delete(medicationId);
+                            // 삭제 후 목록 새로고침
+                            await fetchData();
+                            Alert.alert('성공', '약이 삭제되었습니다.');
+                        } catch (error) {
+                            console.error('약 삭제 실패:', error);
+                            Alert.alert('오류', '약 삭제에 실패했습니다.');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const formatDate = (date: Date) => {
         const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
         const month = date.getMonth() + 1;
@@ -87,6 +115,9 @@ export const useMedicineData = () => {
         showDatePicker,
         setShowDatePicker,
         onRefresh,
-        formatDate
+        formatDate,
+        isEditMode,
+        setIsEditMode,
+        deleteMedication,
     };
 };

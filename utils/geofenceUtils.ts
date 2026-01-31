@@ -86,25 +86,32 @@ export function checkGeofenceEntry(
   }
 
   const now = new Date();
-  const radius = 100; // 기본 반경 100미터
+  const ENTER_RADIUS = 100; // 진입 반경 100미터
+  const EXIT_RADIUS = 150;  // 이탈 반경 150미터 (히스테리시스: GPS 흔들림 방지)
 
   for (const fence of geofences) {
     // 1. 거리 체크
     const distance = calculateDistance(lat, lng, fence.latitude, fence.longitude);
-    const isInside = distance <= radius;
+    const wasInside = !!entryState[fence.id];
 
     // 2. 시간 체크 (일시적 지오펜스만)
     const isTimeActive = fence.type === 0 || isWithinTimeRange(fence.startTime, fence.endTime, now);
 
-    // 3. 진입 조건: 거리 내 + 시간 조건 만족
-    const canEnter = isInside && isTimeActive;
+    // 3. 히스테리시스 적용: 진입은 100m, 이탈은 150m
+    //    - 밖에 있을 때: 100m 이내로 들어오면 진입
+    //    - 안에 있을 때: 150m 밖으로 나가야 이탈
+    const isInsideForEntry = distance <= ENTER_RADIUS;
+    const isInsideForExit = distance <= EXIT_RADIUS;
+
+    const canEnter = isInsideForEntry && isTimeActive;
+    const stillInside = isInsideForExit && isTimeActive;
 
     // 진입 감지: 이전에 밖에 있었는데 지금 안에 들어옴
-    if (canEnter && !entryState[fence.id]) {
+    if (canEnter && !wasInside) {
       entries.push({ geofenceId: fence.id, name: fence.name });
     }
-    // 이탈 감지: 영구 지오펜스만 이탈 추적 (일시적 지오펜스는 진입 후 사라짐)
-    else if (fence.type === 0 && !canEnter && entryState[fence.id]) {
+    // 이탈 감지: 영구 지오펜스만 이탈 추적 (150m 밖으로 나가야 이탈)
+    else if (fence.type === 0 && !stillInside && wasInside) {
       exits.push({ geofenceId: fence.id, name: fence.name });
     }
   }

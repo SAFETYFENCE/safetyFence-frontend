@@ -447,7 +447,24 @@ export const LocationProvider: React.FC<LocationProviderProps> = ({ children }) 
     }
   };
 
-  const subscribeToSupporterTarget = (targetNumber: string) => {
+  const subscribeToSupporterTarget = async (targetNumber: string) => {
+    // 1. 마지막 위치 즉시 조회 (REST API)
+    try {
+      const lastLocation = await locationService.getLastLocation(targetNumber);
+      if (lastLocation) {
+        setTargetLocation({
+          latitude: lastLocation.latitude,
+          longitude: lastLocation.longitude,
+          accuracy: 0,
+          timestamp: lastLocation.timestamp || Date.now(),
+        });
+        console.log('📍 마지막 위치 로드 완료:', lastLocation);
+      }
+    } catch (e) {
+      console.log('ℹ️ 마지막 위치 없음 (최초 접속)');
+    }
+
+    // 2. WebSocket 구독으로 실시간 업데이트 수신
     websocketService.subscribeToUserLocation(targetNumber, (locationData) => {
       console.log('📍 이용자 위치 업데이트:', locationData);
       setTargetLocation({

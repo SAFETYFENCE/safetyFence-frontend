@@ -206,8 +206,8 @@ export const useMapLogic = () => {
 
         const relative = formatRelativeTime(diffMs);
         return userRole === 'supporter'
-            ? `마지막으로 확인된 ${label}의 위치: ${relative}`
-            : `마지막으로 확인된 위치: ${relative}`;
+            ? `${label}의 최근 위치 (${relative})\n※ 이동이 없으면 위치가 갱신되지 않습니다`
+            : `최근 위치 (${relative})`;
     };
 
     return {

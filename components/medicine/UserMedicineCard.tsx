@@ -1,10 +1,12 @@
-import { UserMedicineData } from '@/hooks/useMedicineData';
-import { CheckCircle2, Pill, Sparkles, User as UserIcon } from 'lucide-react-native';
+import { UserMedicineData, DeleteMedicationFn } from '@/hooks/useMedicineData';
+import { CheckCircle2, Pill, Sparkles, Trash2, User as UserIcon } from 'lucide-react-native';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 
 interface UserMedicineCardProps {
     item: UserMedicineData;
+    isEditMode?: boolean;
+    onDeleteMedication?: DeleteMedicationFn;
 }
 
 // Reusing theme for consistency
@@ -13,7 +15,7 @@ const THEME = {
     textSub: '#64748b',
 };
 
-const UserMedicineCard: React.FC<UserMedicineCardProps> = ({ item }) => {
+const UserMedicineCard: React.FC<UserMedicineCardProps> = ({ item, isEditMode = false, onDeleteMedication }) => {
     return (
         <View className="mb-6">
             <View className="flex-row items-end mb-3 px-1">
@@ -68,6 +70,15 @@ const UserMedicineCard: React.FC<UserMedicineCardProps> = ({ item }) => {
                                     return (
                                         <>
                                             <View className={`flex-row items-center ${hasDetails ? 'mb-3' : ''}`}>
+                                                {/* 편집 모드일 때 삭제 버튼 */}
+                                                {isEditMode && onDeleteMedication && (
+                                                    <TouchableOpacity
+                                                        onPress={() => onDeleteMedication(medicine.id, medicine.name)}
+                                                        className="w-8 h-8 rounded-full bg-red-100 items-center justify-center mr-2 flex-shrink-0"
+                                                    >
+                                                        <Trash2 size={16} color="#ef4444" />
+                                                    </TouchableOpacity>
+                                                )}
                                                 <View className={`h-10 w-10 rounded-lg items-center justify-center mr-3 flex-shrink-0 ${medicine.checkCount && medicine.checkCount > 0 ? 'bg-green-100' : 'bg-white border border-gray-200'}`}>
                                                     <Pill size={18} color={medicine.checkCount && medicine.checkCount > 0 ? '#15803d' : '#64748b'} />
                                                 </View>

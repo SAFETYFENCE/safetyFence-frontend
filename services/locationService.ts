@@ -30,6 +30,16 @@ export type LocationUpdateResult =
   | { ok: false; reason: string };
 
 /**
+ * 마지막 위치 응답 타입
+ */
+export interface LastLocationResponse {
+  userNumber: string;
+  latitude: number;
+  longitude: number;
+  timestamp: number;
+}
+
+/**
  * 위치 관련 API 서비스
  * - HTTP 위치 전송 (백그라운드용)
  * - 일일 이동거리 조회
@@ -96,5 +106,29 @@ export const locationService = {
       number ? { number } : {}
     );
     return response.data;
+  },
+
+  /**
+   * 마지막 위치 조회 (보호자용)
+   * GET /location/last/{userNumber}
+   * - 보호자가 지도 진입 시 이용자의 마지막 위치를 즉시 가져오기 위한 API
+   * - 캐시 우선 조회 → DB 폴백
+   * @param userNumber - 조회할 이용자 번호
+   * @returns 마지막 위치 정보 (없으면 null)
+   */
+  async getLastLocation(userNumber: string): Promise<LastLocationResponse | null> {
+    try {
+      const response = await apiClient.get<LastLocationResponse>(
+        `/location/last/${userNumber}`
+      );
+      return response.data;
+    } catch (error: any) {
+      if (error?.response?.status === 404) {
+        console.log('📍 마지막 위치 없음:', userNumber);
+        return null;
+      }
+      console.warn('⚠️ 마지막 위치 조회 실패:', error?.message);
+      return null;
+    }
   },
 };

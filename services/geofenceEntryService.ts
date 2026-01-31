@@ -1,7 +1,7 @@
 import { storage } from '../utils/storage';
 import { geofenceService } from './geofenceService';
 
-const ENTRY_LOCK_TTL_MS = 30_000;
+const ENTRY_LOCK_TTL_MS = 300_000; // 5분 (중복 진입 방지)
 
 export async function processGeofenceEntries(
   entries: Array<{ geofenceId: number; name: string }>,

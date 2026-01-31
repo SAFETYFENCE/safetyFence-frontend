@@ -2,7 +2,7 @@ import CustomDatePicker from '@/components/common/CustomDatePicker';
 import MedicineEmptyState from '@/components/medicine/MedicineEmptyState';
 import UserMedicineCard from '@/components/medicine/UserMedicineCard';
 import { useMedicineData } from '@/hooks/useMedicineData';
-import { CalendarDays } from 'lucide-react-native';
+import { CalendarDays, Pencil } from 'lucide-react-native';
 import React from 'react';
 import {
     ActivityIndicator,
@@ -26,7 +26,10 @@ const MedicinePage: React.FC = () => {
         showDatePicker,
         setShowDatePicker,
         onRefresh,
-        formatDate
+        formatDate,
+        isEditMode,
+        setIsEditMode,
+        deleteMedication,
     } = useMedicineData();
 
     // Premium Color Palette - Health & Trust Theme
@@ -83,9 +86,30 @@ const MedicinePage: React.FC = () => {
             />
 
             <View className="flex-1 px-5">
+                {/* 편집 버튼 */}
+                {userMedicineList.length > 0 && (
+                    <View className="flex-row justify-end mb-3">
+                        <TouchableOpacity
+                            onPress={() => setIsEditMode(!isEditMode)}
+                            className={`flex-row items-center px-4 py-2 rounded-full border ${isEditMode ? 'bg-teal-500 border-teal-500' : 'bg-white border-gray-200'}`}
+                        >
+                            <Pencil size={14} color={isEditMode ? '#ffffff' : '#6b7280'} />
+                            <Text className={`text-sm font-bold ml-1.5 ${isEditMode ? 'text-white' : 'text-gray-600'}`}>
+                                {isEditMode ? '완료' : '편집'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
                 <FlatList
                     data={userMedicineList}
-                    renderItem={({ item }) => <UserMedicineCard item={item} />}
+                    renderItem={({ item }) => (
+                        <UserMedicineCard
+                            item={item}
+                            isEditMode={isEditMode}
+                            onDeleteMedication={deleteMedication}
+                        />
+                    )}
                     keyExtractor={(item) => item.user.userNumber}
                     contentContainerStyle={{ paddingBottom: 100 }}
                     showsVerticalScrollIndicator={false}
